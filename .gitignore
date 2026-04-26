@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+env/
+
+# Environment variables
+.env
+
+# Alembic
+alembic/versions/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (frontend nanti)
+node_modules/
+dist/
+build/
