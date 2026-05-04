@@ -14,28 +14,29 @@ if TYPE_CHECKING:
 class User(Base):
     __tablename__ = "users"
 
-    # id, created_at, updated_at otomatis dari Base
-
-    # ─── Identitas (sudah ada, dipertahankan) ──────────────
+    # ─── Identitas ────────────────────────────────────────
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # ─── Status akun (sudah ada, dipertahankan) ────────────
+    # ─── Nomor HP (BARU) ─────────────────────────────────
+    phone_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # ─── Status akun ─────────────────────────────────────
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # ─── Tambahan baru: gamifikasi ─────────────────────────
+    # ─── Gamifikasi ──────────────────────────────────────
     total_points: Mapped[int] = mapped_column(Integer, default=0)
     scan_count: Mapped[int] = mapped_column(Integer, default=0)
     action_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    # ─── Tambahan baru: profil ─────────────────────────────
+    # ─── Profil ──────────────────────────────────────────
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # ─── Relasi ────────────────────────────────────────────
+    # ─── Relasi ──────────────────────────────────────────
     predictions: Mapped[List["Prediction"]] = relationship(
         "Prediction", back_populates="user", cascade="all, delete-orphan"
     )

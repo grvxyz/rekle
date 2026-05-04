@@ -26,7 +26,50 @@ function GoogleIcon() {
 
 function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+
+  // STATE
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // HANDLE REGISTER
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          full_name: fullName,
+          password: password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Register gagal");
+      }
+
+      // redirect ke login
+      window.location.href = "/login";
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-6">
@@ -56,14 +99,19 @@ function RegisterPage() {
 
           {/* CONTENT */}
           <CardContent>
-            <form className="space-y-2">
+            <form className="space-y-3" onSubmit={handleRegister}>
 
               {/* NAME */}
               <div className="space-y-2">
                 <Label>Nama</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input className="pl-10 h-10" placeholder="Nama lengkap" />
+                  <Input
+                    className="pl-10 h-10"
+                    placeholder="Nama lengkap"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -72,26 +120,41 @@ function RegisterPage() {
                 <Label>Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input className="pl-10 h-10" type="email" placeholder="your@email.com" />
+                  <Input
+                    className="pl-10 h-10"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
               </div>
 
+              {/* PHONE */}
               <div className="space-y-2">
                 <Label>Nomor Telepon</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input className="pl-10 h-10" type="number" placeholder="08xx xxxx xxxx" />
+                  <Input
+                    className="pl-10 h-10"
+                    type="text"
+                    placeholder="08xx xxxx xxxx"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </div>
               </div>
 
               {/* PASSWORD */}
-              <div className="space-y-2 pb-4">
+              <div className="space-y-2">
                 <Label>Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     className="pl-10 pr-10 h-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
@@ -102,15 +165,24 @@ function RegisterPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ERROR */}
+              {error && (
+                <p className="text-red-500 text-sm text-center">
+                  {error}
+                </p>
+              )}
+
+              {/* BUTTON */}
+              <Button className="w-full h-10" type="submit" disabled={loading}>
+                {loading ? "Loading..." : "Daftar"}
+              </Button>
+
             </form>
           </CardContent>
 
           {/* FOOTER */}
           <CardFooter className="flex flex-col gap-4">
-            
-            <Button className="w-full h-10">
-              Daftar
-            </Button>
 
             <div className="flex items-center gap-3 w-full">
               <div className="h-px flex-1 bg-border" />

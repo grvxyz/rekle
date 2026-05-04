@@ -16,13 +16,13 @@ from app.schemas.user_schema import UserCreate, UserLogin, UserResponse
 router = APIRouter()
 
 
+# ──────────────────────────────────────────────
+# REGISTER
+# ──────────────────────────────────────────────
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     """
     Daftarkan user baru.
-    - Cek email belum terdaftar
-    - Hash password
-    - Simpan ke DB
     """
     # Cek email sudah ada
     existing = db.query(User).filter(User.email == payload.email).first()
@@ -36,7 +36,9 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         email=payload.email,
         full_name=payload.full_name,
         hashed_password=get_password_hash(payload.password),
+        phone_number=payload.phone_number,  # ✅ FIX DI SINI
     )
+
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -44,11 +46,13 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     return user
 
 
+# ──────────────────────────────────────────────
+# LOGIN
+# ──────────────────────────────────────────────
 @router.post("/login", response_model=TokenPair)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     """
     Login dengan email + password.
-    Kembalikan access token dan refresh token.
     """
     user = db.query(User).filter(User.email == payload.email).first()
 
@@ -71,11 +75,13 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
     )
 
 
+# ──────────────────────────────────────────────
+# REFRESH TOKEN
+# ──────────────────────────────────────────────
 @router.post("/refresh", response_model=TokenPair)
 def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
     """
     Tukar refresh token dengan access token baru.
-    Refresh token lama tetap valid hingga expired.
     """
     user_id = get_subject_from_token(payload.refresh_token, token_type="refresh")
 
