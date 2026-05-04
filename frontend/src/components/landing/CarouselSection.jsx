@@ -1,66 +1,46 @@
-import * as React from "react";
+import Button from "../ui/button";
 
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-
-export function CarouselSection() {
-  const items = [
-    {
-      title: "Kelola Keuangan",
-      desc: "Catat pemasukan dan pengeluaran dengan mudah",
-    },
-    {
-      title: "Pantau Harian",
-      desc: "Lihat semua transaksi harianmu",
-    },
-    {
-      title: "Analisis Cerdas",
-      desc: "Dapatkan insight keuangan otomatis",
-    },
-    {
-      title: "Aman",
-      desc: "Data kamu tersimpan dengan aman",
-    },
-    {
-      title: "Mulai Sekarang",
-      desc: "Bangun kebiasaan finansial yang baik",
-    },
-  ];
-
+const CarouselSection = () => {
   return (
-    <div className="flex justify-center">
-      <Carousel className="w-full max-w-md">
-        <CarouselContent>
-          {items.map((item, index) => (
-            <CarouselItem key={index} className="md:basis-1/2">
-              <div className="p-2">
-                <Card className="rounded-xl shadow-md hover:shadow-lg transition">
-                  <CardContent className="flex flex-col items-center justify-center p-6 text-center gap-2">
-                    
-                    <h3 className="text-lg font-semibold">
-                      {item.title}
-                    </h3>
+    <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
 
-                    <p className="text-sm text-muted-foreground">
-                      {item.desc}
-                    </p>
+      <div className="absolute inset-0">
+        <img
+          src=""
+          alt="Nature background"
+          className="w-full h-full object-cover"
+        />
+      </div>
 
-                  </CardContent>
-                </Card>
-              </div>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
+      <div className="absolute inset-0 bg-gradient-to-b from-green-950/90 via-green-900/80 to-green-950/95"></div>
+      <div className="relative z-10 text-center px-6 max-w-4xl">
+        <p className="text-emerald-200 uppercase tracking-[0.3em] text-sm mb-6">
+          Rekle 
+        </p>
+        <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
+          Smarter Waste <br />
+          <span className="text-emerald-300">Classification with AI</span>
+        </h1>
+        <p className="mt-6 text-lg text-emerald-100/80 max-w-2xl mx-auto">
+          Pindai sampah Anda dan dapatkan rekomendasi ramah lingkungan secara instan. 
+          Bergabunglah dalam revolusi pengelolaan sampah berkelanjutan.
+        </p>
+        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+          
+          <Button className="rounded-full px-8 py-3 text-lg">
+            Mulai Scan
+          </Button>
 
-        <CarouselPrevious />
-        <CarouselNext />
-      </Carousel>
-    </div>
+          <Button
+            variant="outline"
+            className="rounded-full px-8 py-3 text-lg border-emerald-300 text-green-800 hover:bg-emerald-300 hover:text-black"
+          >
+            Pelajari Lebih Lanjut
+          </Button>
+        </div>
+      </div>
+    </section>
   );
-}
+};
+
+export default CarouselSection;
