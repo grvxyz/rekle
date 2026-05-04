@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar.jsx";
 import LoginPage from "./pages/auth/login.jsx";
 import RegisterPage from "./pages/auth/register.jsx";
+import LandingPage from "./pages/landing/LandingPage.jsx";
 
 function Layout() {
   const location = useLocation();
@@ -18,7 +19,7 @@ function Layout() {
       {!hideNavbar && <Navbar />}
 
       <Routes>
-        <Route path="/" element={<h1 className="text-center mt-10">Landing Page</h1>} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Routes>
