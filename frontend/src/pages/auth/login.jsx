@@ -1,6 +1,6 @@
 import { useState } from "react";
 import logo from "../../logo.svg";
-import { Button } from "../../components/ui/button.jsx";
+import Button from "../../components/ui/button.jsx";
 import {
   Card,
   CardContent,
@@ -10,8 +10,8 @@ import {
   CardTitle,
 } from "../../components/ui/card.jsx";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { Input } from "../../components/ui/input.jsx";
-import { Label } from "../../components/ui/label.jsx";
+import Input from "../../components/ui/input.jsx";
+import Label from "../../components/ui/label.jsx";
 import { Checkbox } from "../../components/ui/checkbox.jsx";
 
 function GoogleIcon() {

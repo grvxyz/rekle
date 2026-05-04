@@ -1,24 +1,25 @@
-import { CarouselSection } from "@/components/landing/CarouselSection";
+import Navbar from "@/components/layout/Navbar";
+import CarouselSection from "@/components/landing/CarouselSection";
+import FeaturesSection from "@/components/landing/FeaturesSection";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import DashboardPreviewSection from "@/components/landing/DashboardPreviewSection";
+import CTASection from "@/components/landing/CTASection";
 
-function LandingPage() {
+const LandingPage = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-10 px-4">
-      
-      {/* TITLE */}
-      <div className="text-center space-y-3">
-        <h1 className="text-4xl font-bold">
-          Selamat Datang di REKLE
-        </h1>
-        <p className="text-muted-foreground max-w-md">
-          Platform cerdas untuk membantu kamu mengelola keuangan dengan lebih mudah dan terstruktur.
-        </p>
-      </div>
-
-      {/* CAROUSEL */}
+    <>
       <CarouselSection />
-
-    </div>
+      <FeaturesSection />
+      <HowItWorksSection />
+      <DashboardPreviewSection />
+      <CTASection />
+      <footer className="text-center py-6 border-t mt-10">
+        <p className="text-sm text-muted-foreground">
+          © 2026 REKLE. All rights reserved.
+        </p>
+      </footer>
+    </>
   );
-}
+};
 
 export default LandingPage;
