@@ -1,11 +1,15 @@
-import Badge from "./ui/badge.jsx";
+import Badge from "./badge.jsx";
 
 function SectionHeader({ badge, title, description, centered = false, dark = false }) {
   return (
     <div className={centered ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}>
-      <Badge variant={dark ? "dark" : "default"}>{badge}</Badge>
+      {badge && (
+        <Badge variant={dark ? "dark" : "default"}>
+          {badge}
+        </Badge>
+      )}
       <h2
-        className={`mt-4 text-3xl font-black leading-tight tracking-[-0.04em] sm:text-4xl ${
+        className={`mt-4 text-3xl font-black leading-tight tracking-[-0.04em] sm:text-4xl whitespace-nowrap ${
           dark ? "text-white" : "text-slate-950"
         }`}
       >
