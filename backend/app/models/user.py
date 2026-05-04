@@ -14,41 +14,41 @@ if TYPE_CHECKING:
 class User(Base):
     __tablename__ = "users"
 
-    # ─── Identitas ────────────────────────────────────────
+    # ─── Identitas ─────────────────────────────
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    # ─── Nomor HP (BARU) ─────────────────────────────────
     phone_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
-    # ─── Status akun ─────────────────────────────────────
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # ─── Status ────────────────────────────────
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # ─── Gamifikasi ──────────────────────────────────────
+    # ─── Gamifikasi ───────────────────────────
     total_points: Mapped[int] = mapped_column(Integer, default=0)
     scan_count: Mapped[int] = mapped_column(Integer, default=0)
     action_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    # ─── Profil ──────────────────────────────────────────
+    # ─── Profil ───────────────────────────────
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # ─── Relasi ──────────────────────────────────────────
+    # ─── Relasi ───────────────────────────────
     predictions: Mapped[List["Prediction"]] = relationship(
         "Prediction", back_populates="user", cascade="all, delete-orphan"
     )
+
     actions: Mapped[List["Action"]] = relationship(
         "Action", back_populates="user", cascade="all, delete-orphan"
     )
+
     badges: Mapped[List["Badge"]] = relationship(
-        "Badge", secondary="user_badges", back_populates="users"
+        "Badge",
+        secondary="user_badges",
+        back_populates="users",
     )
 
-    def __repr__(self) -> str:
-        return f"<User id={self.id} email={self.email!r}>"
-
-    def add_points(self, points: int) -> None:
-        self.total_points += points
+    def __repr__(self):
+        return f"<User id={self.id} email={self.email}>"

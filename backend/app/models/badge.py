@@ -12,39 +12,40 @@ if TYPE_CHECKING:
 class Badge(Base):
     __tablename__ = "badges"
 
-    # id, created_at, updated_at otomatis dari Base
-
+    # ─── Kolom utama ───────────────────────────
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     icon_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    # Jenis badge: scan | action | challenge
-    badge_type: Mapped[str] = mapped_column(String(50), nullable=False, default="scan")
-
-    # Syarat mendapatkan badge (misal: scan 10x, aksi kompos 5x)
+    badge_type: Mapped[str] = mapped_column(String(50), default="scan")
     requirement_count: Mapped[int] = mapped_column(Integer, default=1)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # ─── Relasi ────────────────────────────────────────────
-    # Satu badge bisa dimiliki banyak user (via tabel pivot user_badges)
+    # ─── Relasi MANY TO MANY ───────────────────
     users: Mapped[List["User"]] = relationship(
         "User",
         secondary="user_badges",
         back_populates="badges",
     )
 
-    def __repr__(self) -> str:
-        return f"<Badge id={self.id} name={self.name!r}>"
+    def __repr__(self):
+        return f"<Badge id={self.id} name={self.name}>"
+
 
 
 class UserBadge(Base):
-    """Tabel pivot antara User dan Badge."""
     __tablename__ = "user_badges"
 
+    # ─── Foreign Key ───────────────────────────
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
     )
+
     badge_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("badges.id", ondelete="CASCADE"), primary_key=True
+        Integer,
+        ForeignKey("badges.id", ondelete="CASCADE"),
+        primary_key=True,
     )
