@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.v1.api import api_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="REKLE Backend")
 

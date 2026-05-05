@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from app.models.badge import user_badges
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class User(Base):
 
     badges: Mapped[List["Badge"]] = relationship(
         "Badge",
-        secondary="user_badges",
+        secondary=user_badges,
         back_populates="users",
     )
 
