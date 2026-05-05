@@ -3,6 +3,7 @@ import Navbar from "@/components/layout/Navbar";
 import LoginPage from "./pages/auth/login.jsx";
 import RegisterPage from "./pages/auth/register.jsx";
 import LandingPage from "./pages/landing/LandingPage.jsx";
+import ScanPage from "@/pages/scan/ScanPage";
 
 function Layout() {
   const location = useLocation();
@@ -17,9 +18,10 @@ function Layout() {
       {!hideNavbar && <Navbar />}
 
       <Routes>
-        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/scan" element={<ScanPage />} />
       </Routes>
 
     </div>
