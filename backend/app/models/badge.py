@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, Table, Column
+from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from app.db.base import Base
 
@@ -9,42 +9,63 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+user_badges = Table(
+    "user_badges",
+    Base.metadata,
+    Column(
+        "user_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "badge_id",
+        Integer,
+        ForeignKey("badges.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
 class Badge(Base):
     __tablename__ = "badges"
 
-    # id, created_at, updated_at otomatis dari Base
+    name: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
 
-    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    icon_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True
+    )
 
-    # Jenis badge: scan | action | challenge
-    badge_type: Mapped[str] = mapped_column(String(50), nullable=False, default="scan")
+    icon_url: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True
+    )
 
-    # Syarat mendapatkan badge (misal: scan 10x, aksi kompos 5x)
-    requirement_count: Mapped[int] = mapped_column(Integer, default=1)
+    badge_type: Mapped[str] = mapped_column(
+        String(50),
+        default="scan"
+    )
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    requirement_count: Mapped[int] = mapped_column(
+        Integer,
+        default=1
+    )
 
-    # ─── Relasi ────────────────────────────────────────────
-    # Satu badge bisa dimiliki banyak user (via tabel pivot user_badges)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True
+    )
+
     users: Mapped[List["User"]] = relationship(
         "User",
-        secondary="user_badges",
+        secondary=user_badges,
         back_populates="badges",
     )
 
-    def __repr__(self) -> str:
-        return f"<Badge id={self.id} name={self.name!r}>"
-
-
-class UserBadge(Base):
-    """Tabel pivot antara User dan Badge."""
-    __tablename__ = "user_badges"
-
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    badge_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("badges.id", ondelete="CASCADE"), primary_key=True
-    )
+    def __repr__(self):
+        return f"<Badge id={self.id} name={self.name}>"

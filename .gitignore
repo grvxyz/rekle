@@ -4,8 +4,11 @@ __pycache__/
 *.pyo
 
 # Virtual env
+venv/
 .venv/
-env/
+
+# Database
+*.db
 
 # Environment variables
 .env
@@ -17,7 +20,7 @@ alembic/versions/
 .DS_Store
 Thumbs.db
 
-# Node (frontend nanti)
+# Node
 node_modules/
 dist/
 build/
