@@ -6,7 +6,7 @@ from app.api.v1.endpoints import (
     user,
     admin,
     mitra,
-    action,  # ✅ tambahin ini
+    action, 
 )
 
 api_router = APIRouter()
@@ -26,5 +26,5 @@ api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
 # Mitra
 api_router.include_router(mitra.router, prefix="/mitra", tags=["Mitra"])
 
-# 🔥 Actions (INI YANG KURANG TADI)
+# Actions 
 api_router.include_router(action.router)

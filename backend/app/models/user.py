@@ -32,7 +32,7 @@ class User(Base):
 
     # ─── Profil ───────────────────────────────
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # ─── Relasi ───────────────────────────────

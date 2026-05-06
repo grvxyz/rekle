@@ -12,8 +12,6 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     city: Optional[str] = None
     bio: Optional[str] = None
-
-    # ✅ TAMBAHAN
     phone_number: Optional[str] = Field(None, max_length=20)
 
 
@@ -21,7 +19,6 @@ class UserBase(BaseModel):
 # CREATE (REGISTER)
 # ──────────────────────────────────────────────
 class UserCreate(UserBase):
-    """Body POST /auth/register."""
     password: str
 
     @field_validator("password")
@@ -36,7 +33,6 @@ class UserCreate(UserBase):
 # LOGIN
 # ──────────────────────────────────────────────
 class UserLogin(BaseModel):
-    """Body POST /auth/login."""
     email: EmailStr
     password: str
 
@@ -45,21 +41,17 @@ class UserLogin(BaseModel):
 # UPDATE PROFILE
 # ──────────────────────────────────────────────
 class UserUpdate(BaseModel):
-    """Body PATCH /users/me."""
     full_name: Optional[str] = None
     city: Optional[str] = None
     bio: Optional[str] = None
-    avatar_url: Optional[str] = None
-
-    # ✅ TAMBAHAN
     phone_number: Optional[str] = Field(None, max_length=20)
 
 
+
 # ──────────────────────────────────────────────
-# RESPONSE (PRIVATE USER)
+# RESPONSE
 # ──────────────────────────────────────────────
 class UserResponse(UserBase):
-    """Data user yang aman dikirim ke client."""
     id: int
     is_active: bool
     total_points: int
@@ -70,7 +62,7 @@ class UserResponse(UserBase):
 
     model_config = {"from_attributes": True}
 
-
+    
 # ──────────────────────────────────────────────
 # PUBLIC (LEADERBOARD)
 # ──────────────────────────────────────────────

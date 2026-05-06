@@ -21,7 +21,7 @@ const steps = [
 
 const HowItWorksSection = () => {
   return (
-    <section className="py-20 px-6 max-w-6xl mx-auto">
+    <section className="py-0 px-6 max-w-6xl mx-auto">
       
       <SectionHeader
         title="Cara Kerjanya"

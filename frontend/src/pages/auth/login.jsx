@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import logo from "../../logo.svg";
 import Button from "../../components/ui/button.jsx";
 import {
@@ -15,15 +16,14 @@ import Label from "../../components/ui/label.jsx";
 import { Checkbox } from "../../components/ui/checkbox.jsx";
 
 function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
 
-  // ✅ TAMBAHAN
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ FUNCTION LOGIN
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -41,20 +41,39 @@ function LoginPage() {
         }),
       });
 
-      const data = await res.json();
-
+      // 🔥 cek dulu sebelum json
       if (!res.ok) {
-        throw new Error(data.detail || "Login gagal");
+        const errData = await res.json();
+        throw new Error(errData.detail || "Login gagal");
       }
 
-      // ✅ SIMPAN TOKEN
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      const data = await res.json();
 
-      // ✅ REDIRECT
-      window.location.href = "/dashboard";
+      console.log("LOGIN RESPONSE:", data); // 🔍 debug
+
+      // 🔥 VALIDASI TOKEN
+      if (!data.access_token) {
+        throw new Error("Token tidak ditemukan dari server");
+      }
+
+      // ✅ SIMPAN TOKEN (INI KRUSIAL)
+      localStorage.setItem("access_token", data.access_token);
+
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token);
+      }
+
+      // 🔥 pastikan benar-benar tersimpan
+      console.log(
+        "TOKEN SAVED:",
+        localStorage.getItem("access_token")
+      );
+
+      // ✅ REDIRECT (pakai navigate, bukan window)
+      navigate("/dashboard");
 
     } catch (err) {
+      console.error("LOGIN ERROR:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -83,7 +102,6 @@ function LoginPage() {
           </CardHeader>
 
           <CardContent className="px-6">
-            {/* ✅ FORM SUDAH CONNECT */}
             <form className="space-y-5" onSubmit={handleLogin}>
 
               {/* EMAIL */}
@@ -97,6 +115,7 @@ function LoginPage() {
                     className="pl-10 h-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -111,6 +130,7 @@ function LoginPage() {
                     className="pl-10 pr-10 h-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    required
                   />
                   <button
                     type="button"
@@ -128,14 +148,14 @@ function LoginPage() {
                 <Label>Ingat saya</Label>
               </div>
 
-              {/* ❌ ERROR */}
+              {/* ERROR */}
               {error && (
                 <p className="text-red-500 text-sm text-center">
                   {error}
                 </p>
               )}
 
-              {/* ✅ BUTTON */}
+              {/* BUTTON */}
               <Button type="submit" className="w-full h-10">
                 {loading ? "Loading..." : "Masuk"}
               </Button>
