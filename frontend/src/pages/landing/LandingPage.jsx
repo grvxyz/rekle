@@ -13,11 +13,7 @@ const LandingPage = () => {
       <HowItWorksSection />
       <DashboardPreviewSection />
       <CTASection />
-      <footer className="text-center py-6 border-t mt-10">
-        <p className="text-sm text-muted-foreground">
-          © 2026 REKLE. All rights reserved.
-        </p>
-      </footer>
+      
     </>
   );
 };
