@@ -28,7 +28,7 @@ const CTASection = () => {
                 shadow-md
               "
             >
-              Mulai Scan Sekarang →
+              Mulai Scan Sekarang
             </Button>
           </Link>
         </div>

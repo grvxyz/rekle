@@ -43,7 +43,7 @@ const DashboardPreviewSection = () => {
 
           <div className="mt-8">
             <Button className="rounded-full px-6">
-              Lihat Insight →
+              Lihat Insight
             </Button>
           </div>
         </div>
