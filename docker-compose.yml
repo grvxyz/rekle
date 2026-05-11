@@ -2,38 +2,56 @@ services:
   backend:
     build: ./backend
     container_name: rekle-backend
+
     ports:
       - "8000:8000"
+
     env_file:
       - ./backend/.env
+
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/rekle_db
+
     depends_on:
       - db
+
     volumes:
       - ./backend:/app
 
-  db:
-    image: postgres:15
-    container_name: rekle-db
     restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: rekle_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
   frontend:
     build: ./frontend
     container_name: rekle-frontend
+
     ports:
       - "5173:5173"
+
+    depends_on:
+      - backend
+
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    depends_on:
-      - backend
+
+    restart: always
+
+  db:
+    image: postgres:15
+    container_name: rekle-db
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: rekle_db
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:
