@@ -14,6 +14,7 @@ import LandingPage from "./pages/landing/LandingPage.jsx";
 import ScanPage from "@/pages/scan/ScanPage";
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
 import Profile from "./pages/profile/Profile.jsx";
+import ActionPage from "./pages/action/ActionPage";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
@@ -43,6 +44,7 @@ function Layout() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/" element={<LandingPage />} />
           <Route path="/scan" element={<ScanPage />} />
+          <Route path="/dashboard" element={<Dashboard />} />
 
           <Route
             path="/dashboard"
@@ -54,7 +56,7 @@ function Layout() {
           />
 
           <Route path="/profile" element={<Profile />} />
-
+          <Route path="/action" element={<ActionPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

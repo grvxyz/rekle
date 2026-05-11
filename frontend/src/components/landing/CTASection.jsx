@@ -1,4 +1,5 @@
 import Button from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const CTASection = () => {
   return (
@@ -15,19 +16,21 @@ const CTASection = () => {
         </p>
 
         <div className="mt-8">
-          <Button
-            className="
-              bg-emerald-600 text-white
-              hover:bg-emerald-700
-              rounded-full 
-              px-8 py-3 text-lg
-              transition
-              hover:scale-105
-              shadow-md
-            "
-          >
-            Mulai Scan Sekarang →
-          </Button>
+          <Link to="/scan">
+            <Button
+              className="
+                bg-emerald-600 text-white
+                hover:bg-emerald-700
+                rounded-full 
+                px-8 py-3 text-lg
+                transition
+                hover:scale-105
+                shadow-md
+              "
+            >
+              Mulai Scan Sekarang →
+            </Button>
+          </Link>
         </div>
 
       </div>
