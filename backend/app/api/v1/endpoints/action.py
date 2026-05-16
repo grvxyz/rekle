@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
-import uuid
 
 from app.db.session import get_db
 from app.models.user import User
@@ -10,7 +8,6 @@ from app.models.action import Action
 from app.schemas.action_schema import ActionCreate, ActionResponse, ActionSummary
 from app.api.v1.deps import get_current_user
 
-# ✅ FIX: jangan pakai /api/v1 lagi
 router = APIRouter(prefix="/actions", tags=["Actions"])
 
 
@@ -33,43 +30,40 @@ def create_action(
         "bank_sampah": 20,
         "daur_ulang": 15,
         "eco_brick": 15,
-        "pabrik": 20,
-        "kurangi_penggunaan": 5,
+        "reuse": 10,
+        "tidak_layak": 5,
         "khusus": 10,
     }
 
     earned_points = points_map.get(payload.action_type, 5)
 
+    # FIX 1: Hapus id=uuid (id adalah Integer autoincrement di DB, bukan UUID string)
+    # FIX 2: Pakai field yang benar sesuai models/action.py:
+    #         prediction_id, partner_name, points_earned, status
+    #         Hapus: scan_id, waste_label, mitra_id yang tidak ada di model
+    # FIX 3: Simpan earned_points ke kolom points_earned di DB
     action = Action(
-        id=str(uuid.uuid4()),
         user_id=current_user.id,
-        scan_id=payload.scan_id,
+        prediction_id=payload.prediction_id,
         action_type=payload.action_type,
-        waste_label=payload.waste_label,
-        mitra_id=payload.mitra_id,
+        partner_name=payload.partner_name,
         notes=payload.notes,
-        created_at=datetime.utcnow(),
+        points_earned=earned_points,  # FIX 3: sebelumnya tidak disimpan ke DB
+        status="confirmed",
     )
 
     db.add(action)
 
-    # tambah poin ke user
+    # Tambah poin ke user
     current_user.total_points = (current_user.total_points or 0) + earned_points
+
+    # FIX 5: Increment action_count (sebelumnya tidak pernah di-update)
+    current_user.action_count = (current_user.action_count or 0) + 1
 
     db.commit()
     db.refresh(action)
 
-    return ActionResponse(
-        id=action.id,
-        user_id=action.user_id,
-        scan_id=action.scan_id,
-        action_type=action.action_type,
-        waste_label=action.waste_label,
-        mitra_id=action.mitra_id,
-        notes=action.notes,
-        earned_points=earned_points,
-        created_at=action.created_at,
-    )
+    return action
 
 
 # ──────────────────────────────────────────────
@@ -99,20 +93,7 @@ def get_my_actions(
         .all()
     )
 
-    return [
-        ActionResponse(
-            id=a.id,
-            user_id=a.user_id,
-            scan_id=a.scan_id,
-            action_type=a.action_type,
-            waste_label=a.waste_label,
-            mitra_id=a.mitra_id,
-            notes=a.notes,
-            earned_points=None,  # optional
-            created_at=a.created_at,
-        )
-        for a in actions
-    ]
+    return actions
 
 
 # ──────────────────────────────────────────────
@@ -134,16 +115,19 @@ def get_action_summary(
     )
 
     summary: dict = {}
+    total_pts = 0
     for action in actions:
         summary[action.action_type] = summary.get(action.action_type, 0) + 1
+        total_pts += action.points_earned or 0
 
     most_frequent = max(summary, key=summary.get) if summary else None
 
+    # FIX: pakai total_points_from_actions (bukan total_points) sesuai schema ActionSummary
     return ActionSummary(
         total_actions=len(actions),
         action_breakdown=summary,
         most_frequent_action=most_frequent,
-        total_points=current_user.total_points or 0,
+        total_points_from_actions=total_pts,
     )
 
 
@@ -156,7 +140,7 @@ def get_action_summary(
     summary="Get action detail by ID",
 )
 def get_action_detail(
-    action_id: str,
+    action_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -172,17 +156,7 @@ def get_action_detail(
             detail="Action not found",
         )
 
-    return ActionResponse(
-        id=action.id,
-        user_id=action.user_id,
-        scan_id=action.scan_id,
-        action_type=action.action_type,
-        waste_label=action.waste_label,
-        mitra_id=action.mitra_id,
-        notes=action.notes,
-        earned_points=None,
-        created_at=action.created_at,
-    )
+    return action
 
 
 # ──────────────────────────────────────────────
@@ -194,7 +168,7 @@ def get_action_detail(
     summary="Delete an action",
 )
 def delete_action(
-    action_id: str,
+    action_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -209,6 +183,9 @@ def delete_action(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Action not found",
         )
+
+    # Kurangi action_count saat action dihapus
+    current_user.action_count = max((current_user.action_count or 1) - 1, 0)
 
     db.delete(action)
     db.commit()

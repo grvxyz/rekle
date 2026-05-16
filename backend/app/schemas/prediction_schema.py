@@ -43,8 +43,11 @@ class ActionConfirmSchema(BaseModel):
     notes: Optional[str] = None
 
 
-class ActionResponse(BaseModel):
-    """Response setelah aksi dikonfirmasi."""
+# FIX: Hapus duplikasi ActionResponse dari file ini.
+# ActionResponse kini hanya ada di schemas/action_schema.py agar tidak konflik.
+# ActionConfirmed tetap di sini karena hanya dipakai oleh prediction flow.
+class ActionConfirmedResponse(BaseModel):
+    """Response lengkap POST /action/confirm."""
     id: int
     action_type: str
     partner_name: Optional[str]
@@ -56,7 +59,7 @@ class ActionResponse(BaseModel):
 
 
 class ActionConfirmed(BaseModel):
-    """Response lengkap POST /action/confirm."""
-    action: ActionResponse
+    """Response wrapper lengkap."""
+    action: ActionConfirmedResponse
     total_points: int
     new_badges: List[str] = []

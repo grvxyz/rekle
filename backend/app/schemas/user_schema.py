@@ -47,7 +47,6 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = Field(None, max_length=20)
 
 
-
 # ──────────────────────────────────────────────
 # RESPONSE
 # ──────────────────────────────────────────────
@@ -62,7 +61,7 @@ class UserResponse(UserBase):
 
     model_config = {"from_attributes": True}
 
-    
+
 # ──────────────────────────────────────────────
 # PUBLIC (LEADERBOARD)
 # ──────────────────────────────────────────────

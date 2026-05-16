@@ -11,11 +11,13 @@ import Navbar from "./components/layout/Navbar.jsx";
 import LoginPage from "./pages/auth/login.jsx";
 import RegisterPage from "./pages/auth/register.jsx";
 import LandingPage from "./pages/landing/LandingPage.jsx";
-import ScanPage from "@/pages/scan/ScanPage";
-import Dashboard from "./pages/dashboard/Dashboard.jsx";
+import ScanPage from "./pages/scan/ScanPage";
+import UserDashboard from "./pages/dashboard/Dashboard.jsx";
+import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import Profile from "./pages/profile/Profile.jsx";
 import ActionPage from "./pages/action/ActionPage";
 
+// 🔐 Protected Route (login wajib)
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
 
@@ -23,6 +25,18 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  return children;
+}
+
+// 🔒 Admin Route (superuser only)
+function AdminRoute({ children }) {
+  const token = localStorage.getItem("access_token");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // ⚠️ sementara hanya cek token (backend sudah validasi superuser)
   return children;
 }
 
@@ -40,31 +54,70 @@ function Layout() {
 
       <main className="flex-1">
         <Routes>
+
+          {/* PUBLIC */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/scan" element={<ScanPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
 
+          {/* USER */}
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <UserDashboard />
               </ProtectedRoute>
             }
           />
 
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/action" element={<ActionPage />} />
+          <Route
+            path="/scan"
+            element={
+              <ProtectedRoute>
+                <ScanPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/action"
+            element={
+              <ProtectedRoute>
+                <ActionPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ADMIN */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
+          />
+
+          {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" />} />
+
         </Routes>
       </main>
 
       {!hideLayout && (
         <footer className="text-center py-6 border-t bg-white">
           <p className="text-sm text-gray-400">
-            © 2026 <span className="font-semibold text-green-800">REKLE</span>. 
+            © 2026{" "}
+            <span className="font-semibold text-green-800">REKLE</span>. 
             Bangun kebiasaan ramah lingkungan.
           </p>
         </footer>

@@ -14,7 +14,7 @@ class Token(BaseModel):
 # TOKEN DATA (decode JWT)
 # ──────────────────────────────────────────────
 class TokenData(BaseModel):
-    user_id: Optional[int] = None   # ✅ ubah ke int (lebih cocok)
+    user_id: Optional[int] = None
 
 
 # ──────────────────────────────────────────────

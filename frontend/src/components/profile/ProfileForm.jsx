@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.jsx";
 import { Button } from "../ui/button.jsx";
 import Input from "../ui/input.jsx";
@@ -14,26 +14,77 @@ import {
 
 import ProfileHeader from "./ProfileHeader.jsx";
 
-function ProfileForm({ form, setForm, onSave }) {
-  const [loading, setLoading] = useState(false);
+// ======================================================
+// VALIDASI
+// ======================================================
 
-  // ✏️ HANDLE INPUT
+function validate(form) {
+  const errors = {};
+
+  if (!form.full_name?.trim()) {
+    errors.full_name = "Nama lengkap wajib diisi";
+  }
+
+  if (form.phone_number && !/^[0-9+\-\s()]{7,20}$/.test(form.phone_number)) {
+    errors.phone_number = "Format nomor telepon tidak valid";
+  }
+
+  if (form.bio && form.bio.length > 300) {
+    errors.bio = `Bio terlalu panjang (${form.bio.length}/300)`;
+  }
+
+  return errors;
+}
+
+// ======================================================
+// PROFILE FORM
+// ======================================================
+
+function ProfileForm({ form, setForm, onSave }) {
+  const [loading, setLoading]   = useState(false);
+  const [errors, setErrors]     = useState({});
+  const [savedForm, setSavedForm] = useState(form); // snapshot terakhir yang berhasil disimpan
+
+  // Deteksi apakah ada perubahan dari data tersimpan
+  const isDirty = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(savedForm),
+    [form, savedForm]
+  );
+
+  // ── HANDLE INPUT ──────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    setForm((prev) => ({ ...prev, [name]: value }));
+
+    // Hapus error field ini begitu user mulai mengetik
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
-  // 💾 HANDLE SAVE
+  // ── HANDLE SAVE ───────────────────────────────────────
   const handleSubmit = async () => {
+    const validationErrors = validate(form);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
     try {
       setLoading(true);
+      setErrors({});
       await onSave(form);
+      setSavedForm(form); // update snapshot setelah berhasil
     } catch (err) {
       console.error(err);
-      alert(err.message || "Gagal menyimpan");
+      // Tampilkan error dari server jika ada, fallback ke pesan generik
+      setErrors({ _server: err.response?.data?.detail || err.message || "Gagal menyimpan" });
     } finally {
       setLoading(false);
     }
@@ -48,20 +99,25 @@ function ProfileForm({ form, setForm, onSave }) {
       <CardContent className="space-y-5">
 
         {/* HEADER */}
-        <ProfileHeader
-          name={form.full_name}
-          email={form.email}
-        />
+        <ProfileHeader name={form.full_name} email={form.email} />
 
-        {/* FORM */}
+        {/* SERVER ERROR */}
+        {errors._server && (
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            {errors._server}
+          </div>
+        )}
+
+        {/* FORM GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* NAMA */}
-          <Field label="Nama Lengkap" icon={<User size={16} />}>
+          <Field label="Nama Lengkap" icon={<User size={16} />} error={errors.full_name}>
             <Input
               name="full_name"
               value={form.full_name || ""}
               onChange={handleChange}
+              aria-invalid={!!errors.full_name}
             />
           </Field>
 
@@ -76,16 +132,18 @@ function ProfileForm({ form, setForm, onSave }) {
           </Field>
 
           {/* PHONE */}
-          <Field label="Nomor Telepon" icon={<Phone size={16} />}>
+          <Field label="Nomor Telepon" icon={<Phone size={16} />} error={errors.phone_number}>
             <Input
-              name="phone_number"   // ✅ FIXED
+              name="phone_number"
               value={form.phone_number || ""}
               onChange={handleChange}
+              inputMode="tel"
+              aria-invalid={!!errors.phone_number}
             />
           </Field>
 
           {/* CITY */}
-          <Field label="Kota" icon={<MapPin size={16} />}>
+          <Field label="Kota" icon={<MapPin size={16} />} error={errors.city}>
             <Input
               name="city"
               value={form.city || ""}
@@ -96,24 +154,29 @@ function ProfileForm({ form, setForm, onSave }) {
         </div>
 
         {/* BIO */}
-        <div>
-          <Label className="flex items-center gap-2 mb-2">
-            <FileText size={16} /> Bio
-          </Label>
+        <Field label="Bio" icon={<FileText size={16} />} error={errors.bio}>
           <textarea
             name="bio"
             value={form.bio || ""}
             onChange={handleChange}
-            className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-800"
+            className={`w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-800 resize-none ${
+              errors.bio ? "border-red-400" : ""
+            }`}
             rows={3}
+            maxLength={300}
+            aria-invalid={!!errors.bio}
           />
-        </div>
+          {/* Counter karakter */}
+          <p className="text-xs text-gray-400 text-right mt-1">
+            {(form.bio || "").length}/300
+          </p>
+        </Field>
 
         {/* BUTTON */}
         <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || !isDirty}
             className="gap-2"
           >
             <Save size={16} />
@@ -126,8 +189,11 @@ function ProfileForm({ form, setForm, onSave }) {
   );
 }
 
-// 🔹 REUSABLE FIELD
-function Field({ label, icon, children }) {
+// ======================================================
+// REUSABLE FIELD
+// ======================================================
+
+function Field({ label, icon, error, children }) {
   return (
     <div className="space-y-1">
       <Label className="flex items-center gap-2 text-sm">
@@ -135,6 +201,9 @@ function Field({ label, icon, children }) {
         {label}
       </Label>
       {children}
+      {error && (
+        <p className="text-xs text-red-500 mt-0.5">{error}</p>
+      )}
     </div>
   );
 }

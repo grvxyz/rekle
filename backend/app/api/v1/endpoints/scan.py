@@ -83,8 +83,9 @@ async def upload_and_scan(
     db.add(prediction)
 
     # 6. Update statistik user
-    current_user.scan_count += 1
-    current_user.total_points += settings.points_per_scan
+    # FIX: tambah guard (or 0) agar konsisten dan aman untuk data lama yang mungkin NULL
+    current_user.scan_count = (current_user.scan_count or 0) + 1
+    current_user.total_points = (current_user.total_points or 0) + settings.points_per_scan
 
     db.commit()
     db.refresh(prediction)

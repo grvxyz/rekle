@@ -10,6 +10,8 @@ import {
 } from "recharts";
 
 function ActivityChart({ data }) {
+  const chartData = Array.isArray(data) ? data : [];
+
   return (
     <Card>
       <CardContent className="p-5">
@@ -21,7 +23,7 @@ function ActivityChart({ data }) {
 
         <div className="h-64 mt-4">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
+            <LineChart data={chartData}>
               <XAxis dataKey="date" />
               <YAxis />
               <Tooltip />

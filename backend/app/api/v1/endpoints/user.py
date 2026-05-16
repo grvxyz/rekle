@@ -1,82 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordBearer
 
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user_schema import UserResponse
-from app.schemas.user_schema import UserUpdate  
-from app.core.security import get_subject_from_token
+from app.schemas.user_schema import UserResponse, UserUpdate
+from app.api.v1.deps import get_current_user
 
 router = APIRouter()
-
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 @router.get(
     "/me",
     response_model=UserResponse,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
-def get_current_user(
-    db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme),
+def get_me(
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Ambil data user yang sedang login
+    Ambil data user yang sedang login.
     """
+    return current_user
 
 
-    user_id = get_subject_from_token(token, token_type="access")
-
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token tidak valid atau expired",
-        )
-    
-    user = db.query(User).filter(User.id == int(user_id)).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User tidak ditemukan",
-        )
-
-    return user
-
-@router.put("/me", response_model=UserResponse)
-def update_current_user(
+@router.put(
+    "/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+)
+def update_me(
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
 ):
-    # 🔐 ambil user dari token
-    user_id = get_subject_from_token(token, token_type="access")
+    """
+    Update profil user yang sedang login (partial update).
+    Hanya field yang dikirim (tidak None) yang akan diubah.
+    """
+    updatable_fields = ["full_name", "city", "bio", "phone_number"]
 
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    user = db.query(User).filter(User.id == int(user_id)).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-
-    # ✏️ update field (partial update aman)
-    if payload.full_name is not None:
-        user.full_name = payload.full_name
-
-    if payload.city is not None:
-        user.city = payload.city
-
-    if payload.bio is not None:
-        user.bio = payload.bio
-
-    if payload.phone_number is not None:
-        user.phone_number = payload.phone_number
+    for field in updatable_fields:
+        value = getattr(payload, field, None)
+        if value is not None:
+            setattr(current_user, field, value)
 
     db.commit()
-    db.refresh(user)
+    db.refresh(current_user)
 
-    return user
+    return current_user
