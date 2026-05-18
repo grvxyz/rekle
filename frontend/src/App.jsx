@@ -16,6 +16,7 @@ import UserDashboard from "./pages/dashboard/Dashboard.jsx";
 import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import Profile from "./pages/profile/Profile.jsx";
 import ActionPage from "./pages/action/ActionPage";
+import AdminSidebar from "./components/layout/AdminSidebar.jsx";
 
 // 🔐 Protected Route (login wajib, superuser diarahkan ke admin)
 function ProtectedRoute({ children }) {
@@ -51,7 +52,7 @@ function Layout() {
 
       {!hideLayout && <Navbar />}
 
-      <main className="flex-1">
+      <main className="flex-1 pt-18">
         <Routes>
 
           {/* PUBLIC */}
@@ -101,7 +102,12 @@ function Layout() {
             path="/admin/dashboard"
             element={
               <AdminRoute>
-                <AdminDashboard />
+                <div>
+                  <AdminSidebar />
+                  <div className="ml-64">
+                    <AdminDashboard />
+                  </div>
+                </div>
               </AdminRoute>
             }
           />

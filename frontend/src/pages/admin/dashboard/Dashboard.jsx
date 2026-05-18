@@ -1,23 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
-import api from "@/lib/axios";
 import dayjs from "dayjs";
 
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
+import api from "@/lib/axios";
 
-
-// ======================================================
-// DASHBOARD COMPONENT
-// ======================================================
+import StatsCard from "@/components/admin/dashboard/StatsCard";
+import DashboardInsights from "@/components/admin/dashboard/DashboardInsights";
+import ScanTrendChart from "@/components/admin/dashboard/ScanTrendChart";
+import TopCategoryChart from "@/components/admin/dashboard/TopCategoryChart";
+import SkeletonDashboard from "@/components/admin/dashboard/SkeletonDashboard";
 
 const Dashboard = () => {
   const [dashboard, setDashboard] = useState({
@@ -42,11 +32,6 @@ const Dashboard = () => {
     dayjs().format("YYYY-MM-DD")
   );
 
-
-  // ======================================================
-  // FETCH DATA
-  // ======================================================
-
   const fetchAll = useCallback(async () => {
     try {
       setError("");
@@ -56,13 +41,21 @@ const Dashboard = () => {
         timeseriesResponse,
         insightsResponse,
       ] = await Promise.all([
-        api.get("/admin/dashboard", {                  // ← fix: hapus /api/v1
-          params: { start_date: startDate, end_date: endDate },
+        api.get("/admin/dashboard", {
+          params: {
+            start_date: startDate,
+            end_date: endDate,
+          },
         }),
-        api.get("/admin/analytics/timeseries", {       // ← fix: hapus /api/v1
-          params: { start_date: startDate, end_date: endDate },
+
+        api.get("/admin/analytics/timeseries", {
+          params: {
+            start_date: startDate,
+            end_date: endDate,
+          },
         }),
-        api.get("/admin/analytics/insights"),          // ← fix: hapus /api/v1
+
+        api.get("/admin/analytics/insights"),
       ]);
 
       setDashboard({
@@ -71,12 +64,16 @@ const Dashboard = () => {
         total_actions: dashboardResponse.data?.total_actions || 0,
         total_points_distributed:
           dashboardResponse.data?.total_points_distributed || 0,
-        top_categories: Array.isArray(dashboardResponse.data?.top_categories)
+        top_categories: Array.isArray(
+          dashboardResponse.data?.top_categories
+        )
           ? dashboardResponse.data.top_categories
           : [],
       });
 
-      const formattedTimeseries = Array.isArray(timeseriesResponse.data)
+      const formattedTimeseries = Array.isArray(
+        timeseriesResponse.data
+      )
         ? timeseriesResponse.data.map((item) => ({
             date: item.date,
             total: item.total ?? item.count ?? 0,
@@ -90,7 +87,6 @@ const Dashboard = () => {
           ? insightsResponse.data.insights
           : []
       );
-
     } catch (err) {
       console.error("Dashboard Error:", err);
 
@@ -104,20 +100,10 @@ const Dashboard = () => {
     }
   }, [startDate, endDate]);
 
-
-  // ======================================================
-  // INITIAL LOAD
-  // ======================================================
-
   useEffect(() => {
     setLoading(true);
     fetchAll();
   }, [fetchAll]);
-
-
-  // ======================================================
-  // AUTO REFRESH (30 detik)
-  // ======================================================
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -127,17 +113,7 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [fetchAll]);
 
-
-  // ======================================================
-  // LOADING
-  // ======================================================
-
   if (loading) return <SkeletonDashboard />;
-
-
-  // ======================================================
-  // ERROR
-  // ======================================================
 
   if (error) {
     return (
@@ -149,17 +125,12 @@ const Dashboard = () => {
     );
   }
 
-
-  // ======================================================
-  // UI
-  // ======================================================
-
   return (
     <div className="p-6 space-y-6">
-
-      {/* HEADER */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold">
+          Admin Dashboard
+        </h1>
 
         <button
           onClick={fetchAll}
@@ -169,123 +140,56 @@ const Dashboard = () => {
         </button>
       </div>
 
-
-      {/* FILTER */}
       <div className="flex gap-4 items-center flex-wrap">
         <input
           type="date"
           value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
+          onChange={(e) =>
+            setStartDate(e.target.value)
+          }
           className="border p-2 rounded-xl"
         />
+
         <span>-</span>
+
         <input
           type="date"
           value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
+          onChange={(e) =>
+            setEndDate(e.target.value)
+          }
           className="border p-2 rounded-xl"
         />
       </div>
 
+      <DashboardInsights insights={insights} />
 
-      {/* INSIGHT */}
-      <div className="bg-white p-5 rounded-2xl shadow">
-        <h2 className="font-semibold text-lg mb-4">Insight</h2>
-
-        {insights.length > 0 ? (
-          <div className="space-y-2">
-            {insights.map((text, index) => (
-              <p key={index} className="text-sm text-gray-700">
-                • {text}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-400">Belum ada insight</p>
-        )}
-      </div>
-
-
-      {/* STAT CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card title="Total Users"   value={dashboard.total_users} />
-        <Card title="Total Scans"   value={dashboard.total_scans} />
-        <Card title="Total Actions" value={dashboard.total_actions} />
-        <Card title="Total Points"  value={dashboard.total_points_distributed} />
+        <StatsCard
+          title="Total Users"
+          value={dashboard.total_users}
+        />
+        <StatsCard
+          title="Total Scans"
+          value={dashboard.total_scans}
+        />
+        <StatsCard
+          title="Total Actions"
+          value={dashboard.total_actions}
+        />
+        <StatsCard
+          title="Total Points"
+          value={dashboard.total_points_distributed}
+        />
       </div>
 
+      <ScanTrendChart data={timeseries} />
 
-      {/* LINE CHART — Trend Scan Harian */}
-      <div className="bg-white shadow rounded-2xl p-5">
-        <h2 className="text-lg font-semibold mb-4">Trend Scan Harian</h2>
-
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={timeseries}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis allowDecimals={false} />
-            <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="total"
-              stroke="#16a34a"
-              strokeWidth={3}
-              dot={{ r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-
-      {/* BAR CHART — Top Kategori */}
-      <div className="bg-white shadow rounded-2xl p-5">
-        <h2 className="text-lg font-semibold mb-4">Top Kategori</h2>
-
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={dashboard.top_categories}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="category" />
-            <YAxis allowDecimals={false} />
-            <Tooltip />
-            <Bar dataKey="count" fill="#16a34a" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <TopCategoryChart
+        data={dashboard.top_categories}
+      />
     </div>
   );
 };
-
-
-// ======================================================
-// CARD COMPONENT
-// ======================================================
-
-const Card = ({ title, value }) => (
-  <div className="bg-white shadow rounded-2xl p-5">
-    <p className="text-gray-500 text-sm">{title}</p>
-    <h2 className="text-3xl font-bold mt-2">{value.toLocaleString("id-ID")}</h2>
-  </div>
-);
-
-
-// ======================================================
-// SKELETON
-// ======================================================
-
-const SkeletonDashboard = () => (
-  <div className="p-6 space-y-6 animate-pulse">
-    <div className="h-8 bg-gray-200 w-56 rounded" />
-    <div className="h-16 bg-gray-200 rounded-2xl" />
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-28 bg-gray-200 rounded-2xl" />
-      ))}
-    </div>
-    <div className="h-80 bg-gray-200 rounded-2xl" />
-    <div className="h-80 bg-gray-200 rounded-2xl" />
-  </div>
-);
-
 
 export default Dashboard;

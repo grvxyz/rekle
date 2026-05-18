@@ -52,7 +52,7 @@ function Profile() {
   }
 
   return (
-    <div className="min-h-screen pt-24 px-4 bg-gray-50">
+    <div className="min-h-screen pt-6 px-4 bg-gray-50">
       <div className="max-w-3xl mx-auto">
         <ProfileForm form={form} setForm={setForm} onSave={handleSave} />
       </div>

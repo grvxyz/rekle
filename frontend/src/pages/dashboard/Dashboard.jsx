@@ -102,7 +102,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 pt-24 pb-8">
+    <div className="min-h-screen bg-gray-50 px-4 pt-6 pb-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <HeroSection user={user} navigate={navigate} />
         <SummaryCards
