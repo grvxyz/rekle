@@ -1,30 +1,22 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Recycle,
-  Sparkles,
-  MapPin,
-  ChevronRight,
-} from "lucide-react";
+import { Recycle, MapPin } from "lucide-react";
+import ActionCard from "../../components/action/ActionCard";
+import ActionConfirmationCard from "../../components/action/ActionConfirmationCard";
 
 const ActionPage = () => {
   const navigate = useNavigate();
+  const [selectedAction, setSelectedAction] = useState(null);
 
   const actions = [
     {
-      title: "Reuse / Kerajinan",
-      desc: "Ubah sampah menjadi sesuatu yang bermanfaat dan bernilai.",
-      icon: Sparkles,
-      bg: "bg-amber-100",
-      color: "text-amber-600",
-      path: "/action/reuse",
-    },
-    {
       title: "Daur Ulang",
-      desc: "Kirim ke fasilitas daur ulang agar dapat diproses kembali.",
+      desc: "Ubah sampah menjadi sesuatu yang bermanfaat dan bernilai.",
       icon: Recycle,
       bg: "bg-emerald-100",
       color: "text-emerald-600",
-      path: "/action/recycle",
+      path: "/dashboard",
+      points: 60,
     },
     {
       title: "Bank Sampah Mitra",
@@ -32,19 +24,31 @@ const ActionPage = () => {
       icon: MapPin,
       bg: "bg-blue-100",
       color: "text-blue-600",
-      path: "/action/bank-sampah",
+      path: "/dashboard ",
+      points: 75,
     },
   ];
 
+  const handleConfirm = () => {
+    if (!selectedAction) return;
+
+    setPoints((prev) => prev + selectedAction.points);
+
+    navigate(selectedAction.path);
+  };
+
+  const [points, setPoints] = useState(0);
+
   return (
-    <section className="min-h-screen bg-slate-50 px-6 py-16">
+    <section className="min-h-screen bg-slate-50 px-6 py-16 mt-4">
       <div className="max-w-5xl mx-auto">
-
+        <div className="text-center mb-6">
+          <p className="text-slate-600">Total Poin Kamu</p>
+          <h2 className="text-2xl font-bold text-emerald-600">
+            {points} poin
+          </h2>
+        </div>
         <div className="text-center mb-12">
-          <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 flex items-center justify-center mb-5">
-            <Recycle className="w-10 h-10 text-emerald-600" />
-          </div>
-
           <h1 className="text-4xl font-bold text-slate-800">
             Pilih Aksi Selanjutnya
           </h1>
@@ -58,44 +62,25 @@ const ActionPage = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {actions.map((item, index) => {
-            const Icon = item.icon;
-
-            return (
-              <div
-                key={index}
-                onClick={() => navigate(item.path)}
-                className="
-                  bg-white border rounded-2xl p-6
-                  cursor-pointer
-                  hover:shadow-lg
-                  hover:-translate-y-1
-                  transition
-                "
-              >
-                <div
-                  className={`w-14 h-14 rounded-xl ${item.bg} flex items-center justify-center mb-5`}
-                >
-                  <Icon className={`w-7 h-7 ${item.color}`} />
-                </div>
-
-                <h3 className="text-xl font-semibold text-slate-800">
-                  {item.title}
-                </h3>
-
-                <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-                  {item.desc}
-                </p>
-
-                <div className="mt-6 flex items-center text-emerald-600 font-medium">
-                  Lihat Detail
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid md:grid-cols-2 gap-6">
+          {actions.map((item, index) => (
+            <ActionCard
+              key={index}
+              item={item}
+              onSelect={() => setSelectedAction(item)}
+            />
+          ))}
         </div>
+
+        {selectedAction && (
+          <div className="mt-8">
+            <ActionConfirmationCard
+              action={selectedAction}
+              onConfirm={handleConfirm}
+              onChange={() => setSelectedAction(null)}
+            />
+          </div>
+        )}
 
         <p className="text-center text-sm text-slate-400 mt-10">
           Pilih salah satu aksi untuk melanjutkan

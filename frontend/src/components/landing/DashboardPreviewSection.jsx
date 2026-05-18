@@ -1,5 +1,6 @@
 import Button from "@/components/ui/button";
 import dashboardImg from "@/assets/dashboard.jpg"; 
+import { Link } from "react-router-dom";
 
 const DashboardPreviewSection = () => {
   return (
@@ -41,11 +42,13 @@ const DashboardPreviewSection = () => {
 
           </div>
 
-          <div className="mt-8">
+        <div className="mt-8">
+          <Link to="/action">
             <Button className="rounded-full px-6">
               Lihat Insight
             </Button>
-          </div>
+          </Link>
+        </div>
         </div>
 
         <div className="relative">
