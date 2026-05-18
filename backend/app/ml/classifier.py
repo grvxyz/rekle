@@ -1,5 +1,4 @@
-from typing import Dict, Tuple
-
+from typing import Dict, List, Tuple
 from pathlib import Path
 
 import numpy as np
@@ -8,22 +7,11 @@ import tensorflow as tf
 from app.core.config import settings
 from app.ml.preprocessor import preprocess
 
-# =========================================================
-# MODEL CACHE
-# =========================================================
-# model hanya diload sekali saat startup
 _model: tf.keras.Model | None = None
 
-# =========================================================
-# MODEL PATH
-# =========================================================
-MODEL_PATH = Path(
-    settings.ml_model_path
-)
+MODEL_PATH = Path(settings.ml_model_path)
 
-# =========================================================
-# LOAD MODEL
-# =========================================================
+
 def get_model() -> tf.keras.Model:
 
     global _model
@@ -33,20 +21,12 @@ def get_model() -> tf.keras.Model:
         print("====================================")
         print("[ML] Loading Model")
         print("====================================")
-
         print("MODEL PATH:")
         print(MODEL_PATH)
-
         print()
-
-        print(
-            "FILE EXISTS:",
-            MODEL_PATH.exists()
-        )
-
+        print("FILE EXISTS:", MODEL_PATH.exists())
         print("====================================")
 
-        # cek file model
         if not MODEL_PATH.exists():
             raise FileNotFoundError(
                 f"""
@@ -55,155 +35,94 @@ Model tidak ditemukan.
 Path:
 {MODEL_PATH}
 
-Pastikan file:
-REKLE_MobileNetV2_Final.keras
-
-berada di folder:
-app/ml/
+Pastikan file hasil training notebook (mobilenet_final.keras)
+berada di folder: app/ml/
 """
             )
 
-        # load tensorflow model
-        _model = tf.keras.models.load_model(
-            MODEL_PATH
-        )
-
+        _model = tf.keras.models.load_model(MODEL_PATH)
         print("[ML] Model berhasil dimuat.")
 
     return _model
 
-# =========================================================
-# PREDICT
-# =========================================================
+
 def predict(
-    image_bytes: bytes
+    image_bytes: bytes,
 ) -> Tuple[
     str,
     float,
     Dict[str, float],
-    bool
+    bool,
+    List[Dict],
 ]:
     """
-    Jalankan inferensi AI.
+    Inferensi AI dengan logika confidence sesuai notebook:
+      - is_confident = True hanya jika:
+          (1) confidence >= ml_confidence_threshold  (0.7)
+          (2) gap top-1 vs top-2 >= ml_confidence_gap_threshold (0.2)
+      - Jika tidak memenuhi -> label = "Tidak dikenali"
 
     Returns:
-        label
-        confidence
-        all_scores
-        is_confident
+        label        : kategori sampah
+        confidence   : skor top-1 (0-1)
+        all_scores   : dict semua kelas
+        is_confident : bool
+        top2         : list 2 prediksi teratas [{label, confidence}]
     """
 
-    # =========================
-    # LOAD MODEL
-    # =========================
     model = get_model()
+    labels = settings.ml_class_labels_list
 
-    # =========================
-    # LABELS
-    # =========================
-    labels = (
-        settings.ml_class_labels_list
-    )
+    input_array = preprocess(image_bytes)
 
-    # =========================
-    # PREPROCESS IMAGE
-    # =========================
-    input_array = preprocess(
-        image_bytes
-    )
-
-    # shape:
-    # (1, 224, 224, 3)
-
-    # =========================
-    # PREDICTION
-    # =========================
-    raw_output = model.predict(
-        input_array,
-        verbose=0,
-    )
-
-    # shape:
-    # (1, num_classes)
-
+    raw_output = model.predict(input_array, verbose=0)
     scores = raw_output[0].tolist()
 
-    # =========================
-    # ALL SCORES
-    # =========================
     all_scores: Dict[str, float] = {
-        label: round(
-            float(score),
-            4,
-        )
-        for label, score in zip(
-            labels,
-            scores,
-        )
+        lbl: round(float(s), 4)
+        for lbl, s in zip(labels, scores)
     }
 
-    # =========================
-    # BEST PREDICTION
-    # =========================
-    best_idx = int(
-        np.argmax(scores)
-    )
+    top2_indices = np.argsort(scores)[-2:][::-1]
+    top2: List[Dict] = [
+        {
+            "label": labels[i],
+            "confidence": round(float(scores[i]), 4),
+        }
+        for i in top2_indices
+    ]
 
+    best_idx = int(top2_indices[0])
     label = labels[best_idx]
+    confidence = round(float(scores[best_idx]), 4)
 
-    confidence = round(
-        float(scores[best_idx]),
-        4,
-    )
+    sorted_scores = sorted(scores, reverse=True)
+    gap = round(sorted_scores[0] - sorted_scores[1], 4)
 
-    # =========================
-    # CONFIDENCE CHECK
-    # =========================
     is_confident = (
-        confidence >=
-        settings.ml_confidence_threshold
+        confidence >= settings.ml_confidence_threshold
+        and gap >= settings.ml_confidence_gap_threshold
     )
 
-    # =========================
-    # DEBUG
-    # =========================
-    print("====================================")
-    print("[ML] Prediction Success")
-    print("====================================")
+    if not is_confident:
+        label = "Tidak dikenali"
 
-    print("LABEL:")
-    print(label)
+    if settings.is_development:
+        print("====================================")
+        print("[ML] Prediction Result")
+        print("====================================")
+        print("LABEL    :", label)
+        print("CONFIDENCE:", confidence)
+        print("GAP      :", gap)
+        print("IS_CONF  :", is_confident)
+        print("TOP-2    :", top2)
+        print("ALL      :", all_scores)
+        print("====================================")
 
-    print()
+    return label, confidence, all_scores, is_confident, top2
 
-    print("CONFIDENCE:")
-    print(confidence)
 
-    print()
-
-    print("ALL SCORES:")
-    print(all_scores)
-
-    print("====================================")
-
-    return (
-        label,
-        confidence,
-        all_scores,
-        is_confident,
-    )
-
-# =========================================================
-# PREDICT FROM FILE PATH
-# =========================================================
-def predict_from_path(
-    image_path: str
-):
-    """
-    Helper untuk testing lokal.
-    """
-
+def predict_from_path(image_path: str):
+    """Helper untuk testing lokal."""
     with open(image_path, "rb") as f:
-        return predict(
-            f.read()
-        )
+        return predict(f.read())

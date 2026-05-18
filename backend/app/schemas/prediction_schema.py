@@ -4,6 +4,12 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 
+class Top2Prediction(BaseModel):
+    """Satu item dari top-2 prediksi (sesuai notebook)."""
+    label: str
+    confidence: float
+
+
 class ScanResult(BaseModel):
     """Response dari POST /scan/upload."""
     prediction_id: int
@@ -13,6 +19,9 @@ class ScanResult(BaseModel):
     recommendation: Optional[str]
     all_scores: Dict[str, float]
     image_path: Optional[str] = None
+    top2: List[Top2Prediction] = []
+    # Poin scan yang langsung diberikan
+    points_earned: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -43,9 +52,6 @@ class ActionConfirmSchema(BaseModel):
     notes: Optional[str] = None
 
 
-# FIX: Hapus duplikasi ActionResponse dari file ini.
-# ActionResponse kini hanya ada di schemas/action_schema.py agar tidak konflik.
-# ActionConfirmed tetap di sini karena hanya dipakai oleh prediction flow.
 class ActionConfirmedResponse(BaseModel):
     """Response lengkap POST /action/confirm."""
     id: int

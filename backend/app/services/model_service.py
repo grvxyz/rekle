@@ -10,8 +10,9 @@ import io
 
 from app.core.config import settings
 from app.ml.recommendation import get_full_recommendation
+from app.ml.preprocessor import validate_image
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
-# ─── Load model sekali saat startup ────────────────────────
 _model: Optional[tf.keras.Model] = None
 
 
@@ -24,19 +25,15 @@ def get_model() -> tf.keras.Model:
     return _model
 
 
-# ─── Preprocessing ─────────────────────────────────────────
-
 def _preprocess(image_bytes: bytes) -> np.ndarray:
-    """Resize + normalisasi gambar untuk MobileNetV2."""
-    size = settings.ml_image_size  # 224
+    """Resize + normalisasi gambar untuk MobileNetV2 (sesuai notebook)."""
+    size = settings.ml_image_size
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     img = img.resize((size, size), Image.LANCZOS)
     arr = np.array(img, dtype=np.float32)
-    arr = (arr / 127.5) - 1.0          # normalisasi ke [-1, 1]
-    return np.expand_dims(arr, axis=0)  # (1, 224, 224, 3)
+    arr = preprocess_input(arr)
+    return np.expand_dims(arr, axis=0)
 
-
-# ─── Save image ────────────────────────────────────────────
 
 def _save_image(image_bytes: bytes, content_type: str) -> str:
     """Simpan gambar ke UPLOAD_DIR, kembalikan path."""
@@ -49,46 +46,28 @@ def _save_image(image_bytes: bytes, content_type: str) -> str:
     return filepath
 
 
-# ─── Core predict function ─────────────────────────────────
-
 async def predict_image(file: UploadFile) -> dict:
     """
-    Pipeline lengkap:
-    1. Baca bytes dari UploadFile
-    2. Validasi tipe dan ukuran file
-    3. Preprocessing
-    4. Inferensi model
-    5. Mapping ke rekomendasi
-    6. Simpan gambar
-    7. Kembalikan hasil terstruktur
-
-    Dipanggil dari endpoint POST /predict/
+    Pipeline lengkap untuk endpoint POST /predict/:
+      1. Baca bytes dari UploadFile
+      2. Validasi tipe dan ukuran
+      3. Preprocessing
+      4. Inferensi model
+      5. Confidence check: threshold (0.7) + gap (0.2) sesuai notebook
+      6. Mapping ke rekomendasi
+      7. Simpan gambar
+      8. Kembalikan hasil terstruktur termasuk top-2 dan gap
     """
     # 1. Baca file
     image_bytes = await file.read()
     content_type = file.content_type or "image/jpeg"
 
-    # 2. Validasi tipe
-    # FIX: pakai allowed_image_types_list (List[str]), bukan allowed_image_types (str)
-    # Sebelumnya: content_type not in settings.allowed_image_types
-    # → cek substring, bukan list membership (bisa bypass dengan "image/jp")
-    if content_type not in settings.allowed_image_types_list:
-        return {
-            "success": False,
-            "error": (
-                f"Tipe file tidak didukung: {content_type}. "
-                f"Gunakan: {', '.join(settings.allowed_image_types_list)}"
-            ),
-        }
+    # 2. Validasi
+    is_valid, error_msg = validate_image(image_bytes, content_type)
+    if not is_valid:
+        return {"success": False, "error": error_msg}
 
-    # 3. Validasi ukuran
-    if len(image_bytes) > settings.max_upload_size_bytes:
-        return {
-            "success": False,
-            "error": f"Ukuran file melebihi {settings.max_upload_size_mb}MB",
-        }
-
-    # 4. Preprocessing + inferensi
+    # 3. Preprocessing + inferensi
     try:
         model = get_model()
         input_array = _preprocess(image_bytes)
@@ -97,27 +76,53 @@ async def predict_image(file: UploadFile) -> dict:
     except Exception as e:
         return {"success": False, "error": f"Gagal memproses gambar: {str(e)}"}
 
-    # 5. Petakan skor ke label
-    # FIX: pakai ml_class_labels_list (List[str]), bukan ml_class_labels (str)
+    # 4. Petakan skor ke label
     labels = settings.ml_class_labels_list
-    all_scores = {label: round(float(s), 4) for label, s in zip(labels, scores)}
-    best_idx = int(np.argmax(scores))
+    all_scores = {lbl: round(float(s), 4) for lbl, s in zip(labels, scores)}
+
+    # 5. Top-2 (sesuai notebook)
+    top2_indices = np.argsort(scores)[-2:][::-1]
+    top2 = [
+        {"label": labels[i], "confidence": round(float(scores[i]), 4)}
+        for i in top2_indices
+    ]
+
+    best_idx = int(top2_indices[0])
     result_label = labels[best_idx]
     confidence = round(float(scores[best_idx]), 4)
-    is_confident = confidence >= settings.ml_confidence_threshold
 
-    # 6. Rekomendasi aksi
-    recommendation = get_full_recommendation(result_label)
+    # 6. Confidence check: threshold + gap (sesuai notebook)
+    sorted_scores = sorted(scores, reverse=True)
+    gap = round(sorted_scores[0] - sorted_scores[1], 4)
 
-    # 7. Simpan gambar
+    is_confident = (
+        confidence >= settings.ml_confidence_threshold
+        and gap >= settings.ml_confidence_gap_threshold
+    )
+
+    if not is_confident:
+        result_label = "Tidak dikenali"
+
+    # 7. Rekomendasi aksi
+    recommendation = get_full_recommendation(result_label) if is_confident else {
+        "action_type": None,
+        "label": "Tidak dikenali",
+        "description": "Gambar tidak dapat dikenali. Coba foto ulang.",
+        "icon": "unknown",
+        "can_self": False,
+    }
+
+    # 8. Simpan gambar
     image_path = _save_image(image_bytes, content_type)
 
     return {
         "success": True,
         "result": result_label,
         "confidence": confidence,
+        "gap": gap,
         "is_confident": is_confident,
         "recommendation": recommendation,
         "all_scores": all_scores,
+        "top2": top2,
         "image_path": image_path,
     }
