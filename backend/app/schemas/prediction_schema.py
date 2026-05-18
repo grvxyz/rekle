@@ -4,6 +4,12 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 
+class Top2Prediction(BaseModel):
+    """Satu item dari top-2 prediksi (sesuai notebook)."""
+    label: str
+    confidence: float
+
+
 class ScanResult(BaseModel):
     """Response dari POST /scan/upload."""
     prediction_id: int
@@ -13,6 +19,9 @@ class ScanResult(BaseModel):
     recommendation: Optional[str]
     all_scores: Dict[str, float]
     image_path: Optional[str] = None
+    top2: List[Top2Prediction] = []
+    # Poin scan yang langsung diberikan
+    points_earned: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -43,8 +52,8 @@ class ActionConfirmSchema(BaseModel):
     notes: Optional[str] = None
 
 
-class ActionResponse(BaseModel):
-    """Response setelah aksi dikonfirmasi."""
+class ActionConfirmedResponse(BaseModel):
+    """Response lengkap POST /action/confirm."""
     id: int
     action_type: str
     partner_name: Optional[str]
@@ -56,7 +65,7 @@ class ActionResponse(BaseModel):
 
 
 class ActionConfirmed(BaseModel):
-    """Response lengkap POST /action/confirm."""
-    action: ActionResponse
+    """Response wrapper lengkap."""
+    action: ActionConfirmedResponse
     total_points: int
     new_badges: List[str] = []

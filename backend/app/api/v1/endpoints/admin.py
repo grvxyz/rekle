@@ -1,37 +1,75 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
+from datetime import date, datetime, timedelta, timezone
 
-from app.api.v1.deps import get_current_superuser
 from app.db.session import get_db
 from app.models.user import User
 from app.models.prediction import Prediction
 from app.models.action import Action
 from app.schemas.user_schema import UserResponse
+from app.api.v1.deps import get_current_superuser
 
 router = APIRouter()
 
 
-# ─── Dashboard ─────────────────────────────────────────────
+# =========================================================
+# DASHBOARD
+# =========================================================
 
 @router.get("/dashboard")
 def admin_dashboard(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_superuser),  # proteksi superuser
+    _: User = Depends(get_current_superuser),
 ):
     """
-    Ringkasan statistik keseluruhan platform.
-    Hanya bisa diakses oleh superuser.
+    Ringkasan statistik keseluruhan aplikasi.
+    Semua metrik bisa difilter berdasarkan rentang tanggal.
     """
-    total_users = db.query(func.count(User.id)).scalar()
-    total_scans = db.query(func.count(Prediction.id)).scalar()
-    total_actions = db.query(func.count(Action.id)).scalar()
-    total_points = db.query(func.sum(User.total_points)).scalar() or 0
 
-    # Top 5 kategori sampah terbanyak discan
+    users_query = db.query(func.count(User.id))
+    if start_date and end_date:
+        users_query = users_query.filter(
+            func.date(User.created_at).between(start_date, end_date)
+        )
+    total_users = users_query.scalar() or 0
+
+    scans_query = db.query(func.count(Prediction.id))
+    if start_date and end_date:
+        scans_query = scans_query.filter(
+            func.date(Prediction.created_at).between(start_date, end_date)
+        )
+    total_scans = scans_query.scalar() or 0
+
+    actions_query = db.query(func.count(Action.id))
+    if start_date and end_date:
+        actions_query = actions_query.filter(
+            func.date(Action.created_at).between(start_date, end_date)
+        )
+    total_actions = actions_query.scalar() or 0
+
+    # Filter berdasarkan Action.created_at agar poin yang
+    # dihitung sesuai periode, bukan tanggal registrasi user.
+    points_query = db.query(func.sum(Action.points_earned))
+    if start_date and end_date:
+        points_query = points_query.filter(
+            func.date(Action.created_at).between(start_date, end_date)
+        )
+    total_points = points_query.scalar() or 0
+
+    top_categories_query = db.query(
+        Prediction.result,
+        func.count(Prediction.id).label("count"),
+    )
+    if start_date and end_date:
+        top_categories_query = top_categories_query.filter(
+            func.date(Prediction.created_at).between(start_date, end_date)
+        )
     top_categories = (
-        db.query(Prediction.result, func.count(Prediction.id).label("count"))
+        top_categories_query
         .group_by(Prediction.result)
         .order_by(func.count(Prediction.id).desc())
         .limit(5)
@@ -39,17 +77,20 @@ def admin_dashboard(
     )
 
     return {
-        "total_users":   total_users,
-        "total_scans":   total_scans,
+        "total_users": total_users,
+        "total_scans": total_scans,
         "total_actions": total_actions,
         "total_points_distributed": total_points,
         "top_categories": [
-            {"category": r, "count": c} for r, c in top_categories
+            {"category": result, "count": count}
+            for result, count in top_categories
         ],
     }
 
 
-# ─── User management ───────────────────────────────────────
+# =========================================================
+# USER MANAGEMENT
+# =========================================================
 
 @router.get("/users", response_model=List[UserResponse])
 def list_all_users(
@@ -58,7 +99,7 @@ def list_all_users(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Daftar semua user terdaftar."""
+    """Daftar semua user dengan pagination."""
     return db.query(User).offset(skip).limit(limit).all()
 
 
@@ -66,12 +107,21 @@ def list_all_users(
 def toggle_user_active(
     user_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_superuser),
+    current_admin: User = Depends(get_current_superuser),
 ):
-    """Aktifkan atau nonaktifkan akun user."""
+    """
+    Aktifkan atau nonaktifkan user.
+    Admin tidak bisa menonaktifkan diri sendiri.
+    """
+    if user_id == current_admin.id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tidak bisa mengubah status diri sendiri",
+        )
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User tidak ditemukan")
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
 
     user.is_active = not user.is_active
     db.commit()
@@ -85,16 +135,19 @@ def set_superuser(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_superuser),
 ):
-    """Jadikan user sebagai superuser."""
+    """
+    Jadikan user sebagai superuser.
+    Admin tidak bisa mengubah role diri sendiri.
+    """
     if user_id == current_admin.id:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tidak bisa mengubah status diri sendiri",
+            status_code=400,
+            detail="Tidak bisa mengubah diri sendiri",
         )
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User tidak ditemukan")
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
 
     user.is_superuser = True
     db.commit()
@@ -102,53 +155,233 @@ def set_superuser(
     return user
 
 
-# ─── Analytics ─────────────────────────────────────────────
+# =========================================================
+# ANALYTICS - SCANS
+# =========================================================
 
 @router.get("/analytics/scans")
 def scan_analytics(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Statistik scan per kategori dan per rekomendasi."""
+    """Statistik scan berdasarkan kategori dan rekomendasi."""
+    category_query = db.query(
+        Prediction.result,
+        func.count(Prediction.id).label("count"),
+    )
+    recommendation_query = db.query(
+        Prediction.recommendation,
+        func.count(Prediction.id).label("count"),
+    )
+
+    if start_date and end_date:
+        category_query = category_query.filter(
+            func.date(Prediction.created_at).between(start_date, end_date)
+        )
+        recommendation_query = recommendation_query.filter(
+            func.date(Prediction.created_at).between(start_date, end_date)
+        )
+
     by_category = (
-        db.query(Prediction.result, func.count(Prediction.id).label("count"))
+        category_query
         .group_by(Prediction.result)
         .order_by(func.count(Prediction.id).desc())
         .all()
     )
     by_recommendation = (
-        db.query(Prediction.recommendation, func.count(Prediction.id).label("count"))
+        recommendation_query
         .group_by(Prediction.recommendation)
         .order_by(func.count(Prediction.id).desc())
         .all()
     )
+
     return {
         "by_category": [
-            {"category": r, "count": c} for r, c in by_category
+            {"category": result, "count": count}
+            for result, count in by_category
         ],
         "by_recommendation": [
-            {"recommendation": r, "count": c} for r, c in by_recommendation
+            {"recommendation": recommendation, "count": count}
+            for recommendation, count in by_recommendation
         ],
     }
 
 
+# =========================================================
+# ANALYTICS - ACTIONS
+# =========================================================
+
 @router.get("/analytics/actions")
 def action_analytics(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Statistik aksi nyata yang dilakukan user."""
+    """Statistik aksi berdasarkan tipe dan total poin yang dihasilkan."""
+    query = db.query(
+        Action.action_type,
+        func.count(Action.id).label("count"),
+    )
+    points_query = db.query(func.sum(Action.points_earned))
+
+    if start_date and end_date:
+        query = query.filter(
+            func.date(Action.created_at).between(start_date, end_date)
+        )
+        points_query = points_query.filter(
+            func.date(Action.created_at).between(start_date, end_date)
+        )
+
     by_type = (
-        db.query(Action.action_type, func.count(Action.id).label("count"))
+        query
         .group_by(Action.action_type)
         .order_by(func.count(Action.id).desc())
         .all()
     )
-    total_points = db.query(func.sum(Action.points_earned)).scalar() or 0
+    total_points = points_query.scalar() or 0
 
     return {
         "by_action_type": [
-            {"action_type": t, "count": c} for t, c in by_type
+            {"action_type": action_type, "count": count}
+            for action_type, count in by_type
         ],
         "total_points_from_actions": total_points,
+    }
+
+
+# =========================================================
+# ANALYTICS - TIMESERIES
+# =========================================================
+
+@router.get("/analytics/timeseries")
+def analytics_timeseries(
+    start_date: date,
+    end_date: date,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """
+    Data jumlah scan per hari dalam rentang tanggal tertentu.
+    Tanggal tanpa scan diisi dengan nilai 0.
+    """
+    raw_data = (
+        db.query(
+            func.date(Prediction.created_at).label("date"),
+            func.count(Prediction.id).label("count"),
+        )
+        .filter(
+            func.date(Prediction.created_at).between(start_date, end_date)
+        )
+        .group_by(func.date(Prediction.created_at))
+        .all()
+    )
+
+    data_map = {str(item.date): item.count for item in raw_data}
+
+    result = []
+    current = start_date
+    while current <= end_date:
+        key = str(current)
+        result.append({"date": key, "count": data_map.get(key, 0)})
+        current += timedelta(days=1)
+
+    return result
+
+
+# =========================================================
+# ANALYTICS - INSIGHTS
+# =========================================================
+
+@router.get("/analytics/insights")
+def analytics_insights(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """
+    Insight otomatis berdasarkan data 7 hari terakhir:
+    - Kategori dominan
+    - Pertumbuhan scan vs minggu lalu
+    - Persentase scan yang menghasilkan aksi (periode yang sama)
+    - Peringatan lonjakan scan dalam 24 jam terakhir
+    """
+    now = datetime.now(timezone.utc)
+    this_week_start = now - timedelta(days=7)
+    last_week_start = now - timedelta(days=14)
+
+    this_week_count = (
+        db.query(func.count(Prediction.id))
+        .filter(Prediction.created_at >= this_week_start)
+        .scalar() or 0
+    )
+    last_week_count = (
+        db.query(func.count(Prediction.id))
+        .filter(Prediction.created_at.between(last_week_start, this_week_start))
+        .scalar() or 0
+    )
+
+    growth = 0.0
+    if last_week_count > 0:
+        growth = ((this_week_count - last_week_count) / last_week_count) * 100
+
+    top_category = (
+        db.query(
+            Prediction.result,
+            func.count(Prediction.id).label("count"),
+        )
+        .filter(Prediction.created_at >= this_week_start)
+        .group_by(Prediction.result)
+        .order_by(func.count(Prediction.id).desc())
+        .first()
+    )
+
+    # Aksi dalam periode yang sama (minggu ini) agar rate tidak melebihi 100%
+    this_week_actions = (
+        db.query(func.count(Action.id))
+        .filter(Action.created_at >= this_week_start)
+        .scalar() or 0
+    )
+
+    insights = []
+
+    if top_category and this_week_count > 0:
+        percentage = (top_category.count / this_week_count) * 100
+        insights.append(
+            f"{top_category.result.capitalize()} "
+            f"mendominasi {percentage:.0f}% scan minggu ini"
+        )
+
+    if last_week_count > 0:
+        direction = "naik" if growth >= 0 else "turun"
+        insights.append(f"Scan {direction} {abs(growth):.1f}% dibanding minggu lalu")
+    else:
+        insights.append("Belum ada data pembanding minggu lalu")
+
+    if this_week_count > 0:
+        rate = (this_week_actions / this_week_count) * 100
+        insights.append(f"{rate:.0f}% scan minggu ini menghasilkan aksi")
+
+    yesterday = now - timedelta(days=1)
+    yesterday_count = (
+        db.query(func.count(Prediction.id))
+        .filter(Prediction.created_at >= yesterday)
+        .scalar() or 0
+    )
+    if this_week_count > 0:
+        avg_daily = this_week_count / 7
+        if yesterday_count > avg_daily * 1.5:
+            insights.append("⚠️ Terjadi lonjakan scan dalam 24 jam terakhir")
+
+    if not insights:
+        insights.append("Belum cukup data untuk insight")
+
+    return {
+        "insights": insights,
+        "stats": {
+            "this_week": this_week_count,
+            "last_week": last_week_count,
+            "growth_percent": round(growth, 2),
+        },
     }

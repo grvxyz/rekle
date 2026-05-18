@@ -12,17 +12,20 @@ from app.ml.preprocessor import validate_image
 from app.ml.recommendation import get_recommendation
 from app.models.prediction import Prediction
 from app.models.user import User
-from app.schemas.prediction_schema import ScanHistory, ScanHistoryList, ScanResult
+from app.schemas.prediction_schema import (
+    ScanHistory,
+    ScanHistoryList,
+    ScanResult,
+    Top2Prediction,
+)
 from app.api.v1.deps import get_current_user
 
 router = APIRouter(prefix="/scan", tags=["scan"])
 
 
-# ─── Helper: simpan gambar ke disk ─────────────────────────
-
 def save_image(image_bytes: bytes, content_type: str) -> str:
-    """Simpan gambar ke UPLOAD_DIR, kembalikan path relatif."""
-    ext = content_type.split("/")[-1]  # jpeg | png | webp
+    """Simpan gambar ke UPLOAD_DIR, kembalikan path."""
+    ext = content_type.split("/")[-1]
     filename = f"{uuid.uuid4().hex}.{ext}"
     os.makedirs(settings.upload_dir, exist_ok=True)
     filepath = os.path.join(settings.upload_dir, filename)
@@ -31,8 +34,6 @@ def save_image(image_bytes: bytes, content_type: str) -> str:
     return filepath
 
 
-# ─── Endpoints ─────────────────────────────────────────────
-
 @router.post("/upload", response_model=ScanResult, status_code=status.HTTP_201_CREATED)
 async def upload_and_scan(
     file: UploadFile = File(...),
@@ -40,12 +41,11 @@ async def upload_and_scan(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Upload gambar sampah → klasifikasi AI → kembalikan hasil + rekomendasi.
+    Upload gambar sampah -> klasifikasi AI -> kembalikan hasil + rekomendasi.
 
-    - Validasi file (tipe, ukuran)
-    - Jalankan model MobileNetV2
-    - Simpan hasil ke tabel predictions
-    - Update scan_count dan poin user
+    Poin scan (10) langsung diberikan saat scan berhasil.
+    Poin aksi (50) dan saldo diberikan setelah user menyelesaikan
+    aksi dan diverifikasi admin.
     """
     image_bytes = await file.read()
     content_type = file.content_type or "image/jpeg"
@@ -53,14 +53,17 @@ async def upload_and_scan(
     # 1. Validasi
     is_valid, error_msg = validate_image(image_bytes, content_type)
     if not is_valid:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error_msg,
+        )
 
     # 2. Simpan gambar
     image_path = save_image(image_bytes, content_type)
 
     # 3. Inferensi ML
     try:
-        label, confidence, all_scores, is_confident = predict(image_bytes)
+        label, confidence, all_scores, is_confident, top2 = predict(image_bytes)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -68,7 +71,7 @@ async def upload_and_scan(
         )
 
     # 4. Rekomendasi aksi
-    recommendation = get_recommendation(label)
+    recommendation = get_recommendation(label) if is_confident else None
 
     # 5. Simpan ke DB
     prediction = Prediction(
@@ -82,9 +85,9 @@ async def upload_and_scan(
     )
     db.add(prediction)
 
-    # 6. Update statistik user
-    current_user.scan_count += 1
-    current_user.total_points += settings.points_per_scan
+    # 6. Poin scan langsung diberikan
+    current_user.scan_count = (current_user.scan_count or 0) + 1
+    current_user.total_points = (current_user.total_points or 0) + settings.points_per_scan
 
     db.commit()
     db.refresh(prediction)
@@ -97,6 +100,8 @@ async def upload_and_scan(
         recommendation=recommendation,
         all_scores=all_scores,
         image_path=image_path,
+        top2=[Top2Prediction(**t) for t in top2],
+        points_earned=settings.points_per_scan,
     )
 
 
@@ -140,7 +145,10 @@ def get_scan_detail(
         .first()
     )
     if not prediction:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan tidak ditemukan")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scan tidak ditemukan",
+        )
 
     return ScanResult(
         prediction_id=prediction.id,
@@ -150,4 +158,6 @@ def get_scan_detail(
         recommendation=prediction.recommendation,
         all_scores={},
         image_path=prediction.image_path,
+        top2=[],
+        points_earned=0,
     )

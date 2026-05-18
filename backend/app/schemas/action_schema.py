@@ -1,39 +1,47 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
 
 
-class ActionBase(BaseModel):
+# ─── Request: user buat aksi setelah scan ──────────────────
+class ActionCreateSchema(BaseModel):
+    prediction_id: int
     action_type: str
+    route: str                        # "mandiri" | "mitra"
     partner_name: Optional[str] = None
     notes: Optional[str] = None
 
 
-class ActionCreate(ActionBase):
-    prediction_id: Optional[int] = None
+# ─── Request: admin verifikasi ─────────────────────────────
+class ActionVerifySchema(BaseModel):
+    status: str                       # "approved" | "rejected"
+    notes: Optional[str] = None
+    # Diisi jika route = "mitra", estimasi berat sampah dalam gram
+    weight_gram: Optional[int] = None
 
 
-class ActionUpdateStatus(BaseModel):
-    status: str
-
-
+# ─── Response ──────────────────────────────────────────────
 class ActionResponse(BaseModel):
     id: int
-    user_id: int
-    prediction_id: Optional[int]
     action_type: str
+    route: Optional[str]
     partner_name: Optional[str]
     notes: Optional[str]
+    proof_image_path: Optional[str]
     points_earned: int
+    balance_earned: int
     status: str
+    verified_by: Optional[int]
+    verified_at: Optional[datetime]
     created_at: datetime
 
-    class Config:
-        from_attributes = True  # WAJIB untuk SQLAlchemy
+    model_config = {"from_attributes": True}
 
 
-class ActionSummary(BaseModel):
-    total_actions: int
-    action_breakdown: dict
-    most_frequent_action: Optional[str]
-    total_points_from_actions: int
+class ActionWithRewardResponse(BaseModel):
+    """Response setelah admin approve — berisi reward lengkap."""
+    action: ActionResponse
+    total_points: int
+    total_balance: int
+    new_badges: list[str] = []

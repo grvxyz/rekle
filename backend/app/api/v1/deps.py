@@ -32,7 +32,14 @@ def get_current_user(
     if user_id is None:
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    # FIX: tangkap ValueError/TypeError agar token rusak
+    # menghasilkan 401, bukan 500 Internal Server Error.
+    try:
+        parsed_id = int(user_id)
+    except (ValueError, TypeError):
+        raise credentials_exception
+
+    user = db.query(User).filter(User.id == parsed_id).first()
     if user is None:
         raise credentials_exception
 

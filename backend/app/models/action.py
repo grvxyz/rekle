@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -13,9 +14,6 @@ if TYPE_CHECKING:
 class Action(Base):
     __tablename__ = "actions"
 
-    # id, created_at, updated_at otomatis dari Base
-
-    # ─── Relasi ke user dan prediction ────────────────────
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -23,27 +21,38 @@ class Action(Base):
         Integer, ForeignKey("predictions.id", ondelete="SET NULL"), nullable=True
     )
 
-    # ─── Detail aksi ──────────────────────────────────────
-    # kompos | bank_sampah | daur_ulang | eco_brick | reuse | khusus
+    # kompos | daur_ulang | eco_brick | reuse | khusus
     action_type: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    # Nama mitra jika aksi melibatkan pengiriman ke mitra
-    partner_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    # mandiri | mitra
+    route: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
-    # Catatan tambahan dari user
+    partner_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # ─── Poin ─────────────────────────────────────────────
+    # Foto bukti dari user
+    proof_image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # Poin dari aksi (lebih besar dari scan)
     points_earned: Mapped[int] = mapped_column(Integer, default=0)
 
-    # ─── Status: confirmed | pending | rejected ───────────
-    status: Mapped[str] = mapped_column(String(50), default="confirmed")
+    # Saldo rupiah khusus dari pengiriman ke mitra
+    balance_earned: Mapped[int] = mapped_column(Integer, default=0)
 
-    # ─── Relasi ───────────────────────────────────────────
-    user: Mapped["User"] = relationship("User", back_populates="actions")
+    # pending | approved | rejected
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+
+    verified_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship(
+        "User", back_populates="actions", foreign_keys=[user_id]
+    )
     prediction: Mapped[Optional["Prediction"]] = relationship(
         "Prediction", back_populates="action"
     )
 
     def __repr__(self) -> str:
-        return f"<Action id={self.id} type={self.action_type!r} points={self.points_earned}>"
+        return f"<Action id={self.id} type={self.action_type!r} route={self.route!r} status={self.status!r}>"
