@@ -131,13 +131,6 @@ const Dashboard = () => {
         <h1 className="text-3xl font-bold">
           Admin Dashboard
         </h1>
-
-        <button
-          onClick={fetchAll}
-          className="bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
-        >
-          Refresh
-        </button>
       </div>
 
       <div className="flex gap-4 items-center flex-wrap">
@@ -183,11 +176,10 @@ const Dashboard = () => {
         />
       </div>
 
-      <ScanTrendChart data={timeseries} />
-
-      <TopCategoryChart
-        data={dashboard.top_categories}
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ScanTrendChart data={timeseries} />
+        <TopCategoryChart data={dashboard.top_categories} />
+      </div>
     </div>
   );
 };

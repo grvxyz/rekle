@@ -143,13 +143,6 @@ const KonfirmasiAksi = () => {
             Tinjau dan konfirmasi aksi nyata yang dilaporkan pengguna
           </p>
         </div>
-
-        <button
-          onClick={fetchActions}
-          className="bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
-        >
-          Refresh
-        </button>
       </div>
 
 

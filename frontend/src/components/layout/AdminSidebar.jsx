@@ -12,15 +12,25 @@ import {
 
 const menu = [
   {
+    label: "Analitik",
+    path: "/admin/dashboard",
+    icon: BarChart3,
+  },
+  {
     label: "Persetujuan Aksi",
-    path: "/admin/action-approvals",
+    path: "/admin/konfirmasi",
     icon: CheckCircle,
     badge: 6,
   },
   {
     label: "Data Pengguna",
-    path: "/admin/users",
+    path: "/admin/user",
     icon: Users,
+  },
+  {
+    label: "Data Mitra",
+    path: "/admin/partners",
+    icon: Handshake,
   },
   {
     label: "Data Sampah",
@@ -38,28 +48,15 @@ const menu = [
     icon: ClipboardList,
   },
   {
-    label: "Mitra",
-    path: "/admin/partners",
-    icon: Handshake,
-  },
-  {
     label: "Konten",
     path: "/admin/content",
     icon: FileText,
-  },
-  {
-    label: "Analitik",
-    path: "/admin/dashboard",
-    icon: BarChart3,
   },
 ];
 
 function AdminSidebar() {
   return (
     <aside className="fixed left-0 top-20 w-64 h-[calc(100vh-80px)] bg-white border-r p-4 overflow-y-auto">
-      <h2 className="text-lg font-bold text-green-800 mb-6">
-        Panel Admin
-      </h2>
 
       <nav className="space-y-2">
         {menu.map((item) => {

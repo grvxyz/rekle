@@ -7,37 +7,58 @@ import {
 } from "react-router-dom";
 
 import Navbar from "./components/layout/Navbar.jsx";
+import AdminNavbar from "./components/layout/AdminNavbar.jsx";
+import AdminSidebar from "./components/layout/AdminSidebar.jsx";
 
 import LoginPage from "./pages/auth/login.jsx";
 import RegisterPage from "./pages/auth/register.jsx";
 import LandingPage from "./pages/landing/LandingPage.jsx";
+
 import ScanPage from "./pages/scan/ScanPage";
 import UserDashboard from "./pages/dashboard/Dashboard.jsx";
-import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import Profile from "./pages/profile/Profile.jsx";
 import ActionPage from "./pages/action/ActionPage";
-import AdminSidebar from "./components/layout/AdminSidebar.jsx";
 
-// 🔐 Protected Route (login wajib, superuser diarahkan ke admin)
+import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
+import KonfirmasiAksi from "./pages/admin/konfirmasi/KonfirmasiAksi.jsx";
+import UserManagement from "./pages/admin/user/UserManagement.jsx";
+
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
-  const isSuperuser = localStorage.getItem("is_superuser") === "true";
+  const isSuperuser =
+    localStorage.getItem("is_superuser") === "true";
 
   if (!token) return <Navigate to="/login" replace />;
-  if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
+  if (isSuperuser) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   return children;
 }
 
-// 🔒 Admin Route (superuser only)
 function AdminRoute({ children }) {
   const token = localStorage.getItem("access_token");
-  const isSuperuser = localStorage.getItem("is_superuser") === "true";
+  const isSuperuser =
+    localStorage.getItem("is_superuser") === "true";
 
   if (!token) return <Navigate to="/login" replace />;
-  if (!isSuperuser) return <Navigate to="/dashboard" replace />;
+  if (!isSuperuser) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return children;
+}
+
+function AdminLayout({ children }) {
+  return (
+    <div>
+      <AdminSidebar />
+
+      <div className="ml-64">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function Layout() {
@@ -47,12 +68,18 @@ function Layout() {
     location.pathname === "/login" ||
     location.pathname === "/register";
 
+  const isAdminPage =
+    location.pathname.startsWith("/admin");
+
   return (
     <div className="flex flex-col min-h-screen text-foreground">
 
-      {!hideLayout && <Navbar />}
+      {/* NAVBAR */}
+      {!hideLayout &&
+        (isAdminPage ? <AdminNavbar /> : <Navbar />)}
 
-      <main className="flex-1 pt-18">
+      {/* CONTENT */}
+      <main className="flex-1 pt-20">
         <Routes>
 
           {/* PUBLIC */}
@@ -102,32 +129,55 @@ function Layout() {
             path="/admin/dashboard"
             element={
               <AdminRoute>
-                <div>
-                  <AdminSidebar />
-                  <div className="ml-64">
-                    <AdminDashboard />
-                  </div>
-                </div>
+                <AdminLayout>
+                  <AdminDashboard />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/konfirmasi"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <KonfirmasiAksi />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/user"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <UserManagement />
+                </AdminLayout>
               </AdminRoute>
             }
           />
 
           {/* FALLBACK */}
-          <Route path="*" element={<Navigate to="/" />} />
-
+          <Route
+            path="*"
+            element={<Navigate to="/" />}
+          />
         </Routes>
       </main>
 
-      {!hideLayout && (
+      {/* FOOTER (hanya user/public) */}
+      {!hideLayout && !isAdminPage && (
         <footer className="text-center py-6 border-t bg-white">
           <p className="text-sm text-gray-400">
             © 2026{" "}
-            <span className="font-semibold text-green-800">REKLE</span>. 
-            Bangun kebiasaan ramah lingkungan.
+            <span className="font-semibold text-green-800">
+              REKLE
+            </span>
+            . Bangun kebiasaan ramah lingkungan.
           </p>
         </footer>
       )}
-
     </div>
   );
 }
