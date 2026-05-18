@@ -30,6 +30,7 @@ async function refreshAccessToken() {
 function forceLogout() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
+  localStorage.removeItem("is_superuser"); // ← tambahan
   // Pakai replace agar halaman login tidak masuk history browser
   window.location.replace("/login");
 }

@@ -57,7 +57,7 @@ const KonfirmasiAksi = () => {
       setError("");
       setLoading(true);
 
-      const { data } = await api.get("/api/v1/admin/actions", {
+      const { data } = await api.get("/admin/actions", {   // ← fix: hapus /api/v1
         params: {
           status: statusFilter || undefined,
           page,
@@ -65,8 +65,6 @@ const KonfirmasiAksi = () => {
         },
       });
 
-      // Backend diharapkan mengembalikan:
-      // { actions: [...], total: number }
       setActions(Array.isArray(data.actions) ? data.actions : []);
       setTotalPages(Math.ceil((data.total || 1) / LIMIT));
 
@@ -106,7 +104,7 @@ const KonfirmasiAksi = () => {
     try {
       setActionLoading(actionId);
 
-      await api.patch(`/api/v1/admin/actions/${actionId}`, {
+      await api.patch(`/admin/actions/${actionId}`, {  // ← fix: hapus /api/v1
         status: newStatus,
       });
 

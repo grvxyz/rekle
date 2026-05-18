@@ -14,7 +14,7 @@ const UserManagement = () => {
   const [search, setSearch]     = useState("");
   const [page, setPage]         = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [actionLoading, setActionLoading] = useState(null); // id user yang sedang di-toggle
+  const [actionLoading, setActionLoading] = useState(null);
 
   const LIMIT = 20;
 
@@ -28,7 +28,7 @@ const UserManagement = () => {
       setError("");
       setLoading(true);
 
-      const { data } = await api.get("/api/v1/admin/users", {
+      const { data } = await api.get("/admin/users", {    // ← fix: hapus /api/v1
         params: {
           search: search || undefined,
           page,
@@ -36,8 +36,6 @@ const UserManagement = () => {
         },
       });
 
-      // Backend diharapkan mengembalikan:
-      // { users: [...], total: number, page: number, limit: number }
       setUsers(Array.isArray(data.users) ? data.users : []);
       setTotalPages(Math.ceil((data.total || 1) / LIMIT));
 
@@ -74,11 +72,10 @@ const UserManagement = () => {
     try {
       setActionLoading(user.id);
 
-      await api.patch(`/api/v1/admin/users/${user.id}`, {
+      await api.patch(`/admin/users/${user.id}`, {        // ← fix: hapus /api/v1
         is_active: !user.is_active,
       });
 
-      // Update state lokal tanpa refetch
       setUsers((prev) =>
         prev.map((u) =>
           u.id === user.id ? { ...u, is_active: !u.is_active } : u
@@ -105,7 +102,7 @@ const UserManagement = () => {
     try {
       setActionLoading(user.id);
 
-      await api.patch(`/api/v1/admin/users/${user.id}`, {
+      await api.patch(`/admin/users/${user.id}`, {        // ← fix: hapus /api/v1
         is_superuser: !user.is_superuser,
       });
 

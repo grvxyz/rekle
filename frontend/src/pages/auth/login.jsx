@@ -14,15 +14,16 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Input from "../../components/ui/input.jsx";
 import Label from "../../components/ui/label.jsx";
 import { Checkbox } from "../../components/ui/checkbox.jsx";
+import api from "@/lib/axios";
 
 function LoginPage() {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [email, setEmail]               = useState("");
+  const [password, setPassword]         = useState("");
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState("");
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,51 +31,44 @@ function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      // ── 1. Login → dapat token ──────────────────────
+      const { data } = await api.post("/auth/login", { email, password });
 
-      // 🔥 cek dulu sebelum json
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || "Login gagal");
-      }
-
-      const data = await res.json();
-
-      console.log("LOGIN RESPONSE:", data); // 🔍 debug
-
-      // 🔥 VALIDASI TOKEN
       if (!data.access_token) {
         throw new Error("Token tidak ditemukan dari server");
       }
 
-      // ✅ SIMPAN TOKEN (INI KRUSIAL)
       localStorage.setItem("access_token", data.access_token);
-
       if (data.refresh_token) {
         localStorage.setItem("refresh_token", data.refresh_token);
       }
 
-      // 🔥 pastikan benar-benar tersimpan
-      console.log(
-        "TOKEN SAVED:",
-        localStorage.getItem("access_token")
-      );
+      // ── 2. Fetch profil untuk cek is_superuser ──────
+      const { data: me } = await api.get("/users/me");
 
-      // ✅ REDIRECT (pakai navigate, bukan window)
-      navigate("/dashboard");
+      // ── 3. Simpan role ke localStorage ─────────────
+      localStorage.setItem("is_superuser", me.is_superuser ? "true" : "false");
+
+      // ── 4. Redirect sesuai role ─────────────────────
+      if (me.is_superuser) {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
 
     } catch (err) {
       console.error("LOGIN ERROR:", err);
-      setError(err.message);
+
+      // Hapus semua data kalau login gagal
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("is_superuser");
+
+      setError(
+        err.response?.data?.detail ||
+        err.message ||
+        "Login gagal"
+      );
     } finally {
       setLoading(false);
     }
@@ -150,13 +144,11 @@ function LoginPage() {
 
               {/* ERROR */}
               {error && (
-                <p className="text-red-500 text-sm text-center">
-                  {error}
-                </p>
+                <p className="text-red-500 text-sm text-center">{error}</p>
               )}
 
               {/* BUTTON */}
-              <Button type="submit" className="w-full h-10">
+              <Button type="submit" className="w-full h-10" disabled={loading}>
                 {loading ? "Loading..." : "Masuk"}
               </Button>
 
