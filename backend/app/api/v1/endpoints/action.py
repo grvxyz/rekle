@@ -203,3 +203,18 @@ def get_pending_actions(
         .limit(limit)
         .all()
     )
+
+
+# ─── 6. Admin: jumlah aksi pending (untuk badge sidebar) ───
+@router.get("/pending/count")
+def get_pending_count(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Admin: hitung total aksi yang masih menunggu verifikasi."""
+    count = (
+        db.query(Action)
+        .filter(Action.status == "pending")
+        .count()
+    )
+    return {"count": count}

@@ -10,6 +10,8 @@ from app.models.prediction import Prediction
 from app.models.action import Action
 from app.schemas.user_schema import UserResponse
 from app.api.v1.deps import get_current_superuser
+from app.models.content import Content
+from app.schemas.content_schema import ContentCreate, ContentUpdate, ContentResponse
 
 router = APIRouter()
 
@@ -300,13 +302,6 @@ def analytics_insights(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """
-    Insight otomatis berdasarkan data 7 hari terakhir:
-    - Kategori dominan
-    - Pertumbuhan scan vs minggu lalu
-    - Persentase scan yang menghasilkan aksi (periode yang sama)
-    - Peringatan lonjakan scan dalam 24 jam terakhir
-    """
     now = datetime.now(timezone.utc)
     this_week_start = now - timedelta(days=7)
     last_week_start = now - timedelta(days=14)
@@ -337,7 +332,6 @@ def analytics_insights(
         .first()
     )
 
-    # Aksi dalam periode yang sama (minggu ini) agar rate tidak melebihi 100%
     this_week_actions = (
         db.query(func.count(Action.id))
         .filter(Action.created_at >= this_week_start)
@@ -349,8 +343,7 @@ def analytics_insights(
     if top_category and this_week_count > 0:
         percentage = (top_category.count / this_week_count) * 100
         insights.append(
-            f"{top_category.result.capitalize()} "
-            f"mendominasi {percentage:.0f}% scan minggu ini"
+            f"{top_category.result.capitalize()} mendominasi {percentage:.0f}% scan minggu ini"
         )
 
     if last_week_count > 0:
@@ -369,6 +362,7 @@ def analytics_insights(
         .filter(Prediction.created_at >= yesterday)
         .scalar() or 0
     )
+
     if this_week_count > 0:
         avg_daily = this_week_count / 7
         if yesterday_count > avg_daily * 1.5:
@@ -385,3 +379,84 @@ def analytics_insights(
             "growth_percent": round(growth, 2),
         },
     }
+
+
+# =========================================================
+# CONTENT MANAGEMENT
+# =========================================================
+
+@router.get("/content", response_model=List[ContentResponse])
+def get_contents(
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    query = db.query(Content)
+
+    if type:
+        query = query.filter(Content.type == type)
+
+    if status:
+        query = query.filter(Content.status == status)
+
+    return query.order_by(Content.created_at.desc()).all()
+
+
+@router.get("/content/{content_id}", response_model=ContentResponse)
+def get_content_detail(
+    content_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    content = db.query(Content).filter(Content.id == content_id).first()
+    if not content:
+        raise HTTPException(status_code=404, detail="Content tidak ditemukan")
+    return content
+
+
+@router.post("/content", response_model=ContentResponse)
+def create_content(
+    data: ContentCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    content = Content(**data.dict())
+    db.add(content)
+    db.commit()
+    db.refresh(content)
+    return content
+
+
+@router.put("/content/{content_id}", response_model=ContentResponse)
+def update_content(
+    content_id: int,
+    data: ContentUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    content = db.query(Content).filter(Content.id == content_id).first()
+    if not content:
+        raise HTTPException(status_code=404, detail="Content tidak ditemukan")
+
+    for key, value in data.dict(exclude_unset=True).items():
+        setattr(content, key, value)
+
+    db.commit()
+    db.refresh(content)
+    return content
+
+
+@router.delete("/content/{content_id}")
+def delete_content(
+    content_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    content = db.query(Content).filter(Content.id == content_id).first()
+    if not content:
+        raise HTTPException(status_code=404, detail="Content tidak ditemukan")
+
+    db.delete(content)
+    db.commit()
+    return {"message": "Content berhasil dihapus"}

@@ -53,15 +53,29 @@ const STATUS_CONFIG = {
   inactive:  { label: "Inactive",  cls: "text-gray-400"  },
 };
 
+// FIX #1: Gunakan "type" bukan "content_type" agar sesuai schema backend
 const EMPTY_FORM = {
   title: "",
   description: "",
-  content_type: "tip",
+  type: "tip",      // ✅ was: content_type
   status: "draft",
 };
 
 const inputCls =
   "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500";
+
+// ─── Helper: parse error detail dari Pydantic/FastAPI ───────
+// FIX #2: detail bisa berupa string atau array of objects — jangan render mentah
+const parseErrorDetail = (err) => {
+  const detail = err.response?.data?.detail;
+  if (!detail) return "Gagal menyimpan konten. Periksa koneksi atau coba lagi.";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    // Pydantic v2 validation error: [{loc, msg, type, input}, ...]
+    return detail.map((e) => e.msg ?? JSON.stringify(e)).join(", ");
+  }
+  return "Gagal menyimpan konten. Periksa koneksi atau coba lagi.";
+};
 
 // ─── Skeleton ───────────────────────────────────────────────
 
@@ -102,9 +116,19 @@ const Field = ({ label, children }) => (
 // ─── Modal Form (tambah / edit) ─────────────────────────────
 
 const ContentFormModal = ({ initial, onClose, onSave }) => {
-  const [form, setForm] = useState(initial ? { ...initial } : EMPTY_FORM);
+  // FIX #3: Saat edit, pastikan field "type" ada (item dari API pakai "type")
+  const [form, setForm] = useState(
+    initial
+      ? {
+          title:       initial.title       ?? "",
+          description: initial.description ?? "",
+          type:        initial.type        ?? "tip",  // ✅ was: content_type
+          status:      initial.status      ?? "draft",
+        }
+      : EMPTY_FORM
+  );
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]   = useState("");
   const isEdit = Boolean(initial);
 
   const set = (key, value) => setForm((p) => ({ ...p, [key]: value }));
@@ -120,8 +144,8 @@ const ContentFormModal = ({ initial, onClose, onSave }) => {
 
       let result;
       if (isEdit) {
-        // PATCH /api/v1/admin/content/{id}   (sesuaikan bila endpoint beda)
-        const { data } = await api.patch(`/admin/content/${initial.id}`, form);
+        // PUT /api/v1/admin/content/{id}
+        const { data } = await api.put(`/admin/content/${initial.id}`, form);
         result = data;
       } else {
         // POST /api/v1/admin/content
@@ -131,10 +155,8 @@ const ContentFormModal = ({ initial, onClose, onSave }) => {
       onSave(result);
     } catch (err) {
       console.error("Save content error:", err);
-      setError(
-        err.response?.data?.detail ||
-        "Gagal menyimpan konten. Periksa koneksi atau coba lagi."
-      );
+      // FIX #2: Selalu hasilkan string, bukan object/array
+      setError(parseErrorDetail(err));
     } finally {
       setSaving(false);
     }
@@ -162,6 +184,7 @@ const ContentFormModal = ({ initial, onClose, onSave }) => {
           {error && (
             <div className="flex items-center gap-2 bg-red-50 text-red-600 text-sm p-3 rounded-xl">
               <AlertCircle className="w-4 h-4 shrink-0" />
+              {/* error dijamin string, aman di-render */}
               {error}
             </div>
           )}
@@ -189,8 +212,8 @@ const ContentFormModal = ({ initial, onClose, onSave }) => {
             <Field label="Tipe">
               <select
                 className={inputCls}
-                value={form.content_type}
-                onChange={(e) => set("content_type", e.target.value)}
+                value={form.type}                          // ✅ was: form.content_type
+                onChange={(e) => set("type", e.target.value)} // ✅ was: "content_type"
               >
                 <option value="tip">Tips</option>
                 <option value="challenge">Challenge</option>
@@ -244,7 +267,8 @@ const ContentFormModal = ({ initial, onClose, onSave }) => {
 // ─── Content Card ────────────────────────────────────────────
 
 const ContentCard = ({ item, onEdit, onDelete, deleting }) => {
-  const type = TYPE_CONFIG[item.content_type] ?? TYPE_CONFIG.tip;
+  // FIX #4: item dari API pakai "type", bukan "content_type"
+  const type   = TYPE_CONFIG[item.type]   ?? TYPE_CONFIG.tip;    // ✅ was: item.content_type
   const status = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.draft;
 
   const createdAt = item.created_at
@@ -313,9 +337,9 @@ const ContentCard = ({ item, onEdit, onDelete, deleting }) => {
 // ─── Main Page ───────────────────────────────────────────────
 
 const ContentManagement = () => {
-  const [items, setItems]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState("");
+  const [items, setItems]           = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
 
   const [activeType, setActiveType] = useState("all");
   const [search, setSearch]         = useState("");
@@ -330,15 +354,11 @@ const ContentManagement = () => {
       setLoading(true);
       setError("");
 
-      // GET /api/v1/admin/content
-      // query: type (opsional), search (opsional)
       const params = {};
       if (activeType !== "all") params.type = activeType;
       if (search.trim())        params.search = search.trim();
 
       const { data } = await api.get("/admin/content", { params });
-
-      console.log("Content:", data);
 
       if (Array.isArray(data)) {
         setItems(data);
@@ -347,9 +367,9 @@ const ContentManagement = () => {
       }
     } catch (err) {
       console.error("Fetch content error:", err);
-      if (err.response?.status === 401) setError("Silakan login terlebih dahulu");
+      if (err.response?.status === 401)      setError("Silakan login terlebih dahulu");
       else if (err.response?.status === 403) setError("Akses admin ditolak");
-      else setError("Gagal mengambil data konten");
+      else                                   setError("Gagal mengambil data konten");
     } finally {
       setLoading(false);
     }
@@ -384,7 +404,6 @@ const ContentManagement = () => {
 
     try {
       setDeleting(item.id);
-      // DELETE /api/v1/admin/content/{id}
       await api.delete(`/admin/content/${item.id}`);
       setItems((prev) => prev.filter((i) => i.id !== item.id));
     } catch (err) {
@@ -395,11 +414,10 @@ const ContentManagement = () => {
     }
   };
 
-  // ── Filtered list (client-side fallback if API doesn't filter) ──
-
+  // ── Filtered list (client-side fallback) ─────────────────
+  // FIX #5: filter pakai item.type, bukan item.content_type
   const filtered = items.filter((item) => {
-    const matchType =
-      activeType === "all" || item.content_type === activeType;
+    const matchType   = activeType === "all" || item.type === activeType; // ✅ was: item.content_type
     const matchSearch =
       !search.trim() ||
       item.title?.toLowerCase().includes(search.toLowerCase()) ||
