@@ -6,6 +6,7 @@ import SummaryCards from "../../components/dashboard/SummaryCards.jsx";
 import InsightCard from "../../components/dashboard/InsightCard.jsx";
 import ActivityChart from "../../components/dashboard/ActivityChart.jsx";
 import RecentHistory from "../../components/dashboard/RecentHistory.jsx";
+import api from "../../lib/axios.js";
 
 function Dashboard() {
   const [user, setUser] = useState(null);
@@ -16,48 +17,37 @@ function Dashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
-
-    console.log("TOKEN DASHBOARD:", token);
+    const isSuperuser = localStorage.getItem("is_superuser") === "true";
 
     if (!token) {
       navigate("/login");
       return;
     }
 
+    // Superuser tidak boleh di halaman user
+    if (isSuperuser) {
+      navigate("/admin/dashboard", { replace: true });
+      return;
+    }
+
     const fetchAll = async () => {
       try {
-        const userRes = await fetch("http://localhost:8000/api/v1/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!userRes.ok) throw new Error("Unauthorized user");
-
-        const userData = await userRes.json();
+        const { data: userData } = await api.get("/users/me");
         setUser(userData);
 
-        const historyRes = await fetch(
-          "http://localhost:8000/api/v1/scan/history",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        if (!historyRes.ok) {
-          console.warn("History API gagal:", historyRes.status);
+        try {
+          const { data: historyData } = await api.get("/scan/history");
+          const items = historyData.items || [];
+          setHistory(items);
+          processInsight(items);
+        } catch {
+          console.warn("History API gagal");
           setHistory([]);
           processInsight([]);
-          return;
         }
 
-        const historyData = await historyRes.json();
-
-        const items = historyData.items || [];
-
-        setHistory(items);
-        processInsight(items);
       } catch (err) {
         console.error(err);
-        localStorage.removeItem("access_token");
         navigate("/login");
       }
     };
@@ -77,7 +67,6 @@ function Dashboard() {
 
     items.forEach((item) => {
       const date = new Date(item.created_at).toLocaleDateString("id-ID");
-
       countByDate[date] = (countByDate[date] || 0) + 1;
       categoryCount[item.result] = (categoryCount[item.result] || 0) + 1;
     });

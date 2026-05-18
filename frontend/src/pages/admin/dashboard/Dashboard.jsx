@@ -56,13 +56,13 @@ const Dashboard = () => {
         timeseriesResponse,
         insightsResponse,
       ] = await Promise.all([
-        api.get("/api/v1/admin/dashboard", {
+        api.get("/admin/dashboard", {                  // ← fix: hapus /api/v1
           params: { start_date: startDate, end_date: endDate },
         }),
-        api.get("/api/v1/admin/analytics/timeseries", {
+        api.get("/admin/analytics/timeseries", {       // ← fix: hapus /api/v1
           params: { start_date: startDate, end_date: endDate },
         }),
-        api.get("/api/v1/admin/analytics/insights"),
+        api.get("/admin/analytics/insights"),          // ← fix: hapus /api/v1
       ]);
 
       setDashboard({

@@ -17,13 +17,13 @@ import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import Profile from "./pages/profile/Profile.jsx";
 import ActionPage from "./pages/action/ActionPage";
 
-// 🔐 Protected Route (login wajib)
+// 🔐 Protected Route (login wajib, superuser diarahkan ke admin)
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
+  const isSuperuser = localStorage.getItem("is_superuser") === "true";
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
+  if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
 
   return children;
 }
@@ -31,12 +31,11 @@ function ProtectedRoute({ children }) {
 // 🔒 Admin Route (superuser only)
 function AdminRoute({ children }) {
   const token = localStorage.getItem("access_token");
+  const isSuperuser = localStorage.getItem("is_superuser") === "true";
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
+  if (!isSuperuser) return <Navigate to="/dashboard" replace />;
 
-  // ⚠️ sementara hanya cek token (backend sudah validasi superuser)
   return children;
 }
 

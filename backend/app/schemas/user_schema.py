@@ -53,6 +53,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    is_superuser: bool  
     total_points: int
     scan_count: int
     action_count: int
