@@ -44,6 +44,22 @@ class MitraCreate(BaseModel):
     longitude: Optional[float] = None
     accepted_waste: Optional[str] = None
     mitra_type: str = "bank_sampah"
+    is_active: bool = True
+
+
+class MitraUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    accepted_waste: Optional[str] = None
+    mitra_type: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 # ─── Endpoints public ──────────────────────────────────────
@@ -67,7 +83,6 @@ def mitra_data(
     if mitra_type:
         query = query.filter(Mitra.mitra_type == mitra_type)
     if waste_type:
-        # Filter mitra yang menerima jenis sampah tertentu
         query = query.filter(Mitra.accepted_waste.ilike(f"%{waste_type}%"))
 
     return query.order_by(Mitra.name).all()
@@ -110,6 +125,34 @@ def mitra_by_waste(
 
 # ─── Endpoints admin only ──────────────────────────────────
 
+@router.get("/admin/all", response_model=List[MitraResponse])
+def admin_list_mitras(
+    search: Optional[str] = Query(None),
+    mitra_type: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """
+    Daftar semua mitra (aktif & non-aktif) untuk halaman admin.
+    Bisa difilter dan dipaginasi.
+    """
+    query = db.query(Mitra)
+
+    if search:
+        query = query.filter(
+            Mitra.name.ilike(f"%{search}%") | Mitra.city.ilike(f"%{search}%")
+        )
+    if mitra_type:
+        query = query.filter(Mitra.mitra_type == mitra_type)
+    if is_active is not None:
+        query = query.filter(Mitra.is_active == is_active)
+
+    return query.order_by(Mitra.name).offset(skip).limit(limit).all()
+
+
 @router.post("/data", response_model=MitraResponse, status_code=status.HTTP_201_CREATED)
 def create_mitra(
     payload: MitraCreate,
@@ -119,6 +162,27 @@ def create_mitra(
     """Tambah mitra baru. Hanya superuser."""
     mitra = Mitra(**payload.model_dump())
     db.add(mitra)
+    db.commit()
+    db.refresh(mitra)
+    return mitra
+
+
+@router.patch("/data/{mitra_id}", response_model=MitraResponse)
+def update_mitra(
+    mitra_id: int,
+    payload: MitraUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Edit data mitra. Hanya superuser."""
+    mitra = db.query(Mitra).filter(Mitra.id == mitra_id).first()
+    if not mitra:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mitra tidak ditemukan")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(mitra, key, value)
+
     db.commit()
     db.refresh(mitra)
     return mitra
@@ -138,3 +202,17 @@ def toggle_mitra_active(
     db.commit()
     db.refresh(mitra)
     return mitra
+
+
+@router.delete("/data/{mitra_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_mitra(
+    mitra_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Hapus mitra permanen. Hanya superuser."""
+    mitra = db.query(Mitra).filter(Mitra.id == mitra_id).first()
+    if not mitra:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mitra tidak ditemukan")
+    db.delete(mitra)
+    db.commit() 

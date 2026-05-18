@@ -22,6 +22,11 @@ import ActionPage from "./pages/action/ActionPage";
 import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import KonfirmasiAksi from "./pages/admin/konfirmasi/KonfirmasiAksi.jsx";
 import UserManagement from "./pages/admin/user/UserManagement.jsx";
+import DataMitra from "./pages/admin/mitra/DataMitra.jsx";
+import DataSampah from "./pages/admin/datasampah/DataSampah.jsx";
+import AIMonitoring from "./pages/admin/ai-monitoring/AIMonitoring.jsx";
+import ActionTracking from "./pages/admin/action-tracking/ActionTracking.jsx";
+import ContentManagement from "./pages/admin/content/ContentManagement.jsx";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
@@ -153,6 +158,61 @@ function Layout() {
               <AdminRoute>
                 <AdminLayout>
                   <UserManagement />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/partners"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <DataMitra />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/waste-data"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <DataSampah />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/ai-monitoring"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AIMonitoring />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/action-tracking"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <ActionTracking />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/content"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <ContentManagement />
                 </AdminLayout>
               </AdminRoute>
             }
