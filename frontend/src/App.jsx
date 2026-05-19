@@ -9,6 +9,7 @@ import {
 import Navbar from "./components/layout/Navbar.jsx";
 import AdminNavbar from "./components/layout/AdminNavbar.jsx";
 import AdminSidebar from "./components/layout/AdminSidebar.jsx";
+import MitraSidebar from "./components/layout/MitraSidebar.jsx";
 
 import LoginPage from "./pages/auth/login.jsx";
 import RegisterPage from "./pages/auth/register.jsx";
@@ -28,37 +29,51 @@ import AIMonitoring from "./pages/admin/ai-monitoring/AIMonitoring.jsx";
 import ActionTracking from "./pages/admin/action-tracking/ActionTracking.jsx";
 import ContentManagement from "./pages/admin/content/ContentManagement.jsx";
 
+import MitraLogin from "./pages/mitra/MitraLogin.jsx";
+import MitraRegister from "./pages/mitra/MitraRegister.jsx";
+import MitraDashboard from "./pages/mitra/MitraDashboard.jsx";
+import MitraVerifikasi from "./pages/mitra/MitraVerifikasi.jsx";
+import MitraProfil from "./pages/mitra/MitraProfil.jsx";
+import MitraRiwayat from "./pages/mitra/MitraRiwayat.jsx";
+
+// ─── Route Guards ───────────────────────────────────────────
+
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
-  const isSuperuser =
-    localStorage.getItem("is_superuser") === "true";
+  const isSuperuser = localStorage.getItem("is_superuser") === "true";
 
   if (!token) return <Navigate to="/login" replace />;
-  if (isSuperuser) {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
+  if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
 
   return children;
 }
 
 function AdminRoute({ children }) {
   const token = localStorage.getItem("access_token");
-  const isSuperuser =
-    localStorage.getItem("is_superuser") === "true";
+  const isSuperuser = localStorage.getItem("is_superuser") === "true";
 
   if (!token) return <Navigate to="/login" replace />;
-  if (!isSuperuser) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!isSuperuser) return <Navigate to="/dashboard" replace />;
 
   return children;
 }
+
+function MitraRoute({ children }) {
+  const token = localStorage.getItem("access_token");
+  const isSuperuser = localStorage.getItem("is_superuser") === "true";
+
+  if (!token) return <Navigate to="/mitra/login" replace />;
+  if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
+
+  return children;
+}
+
+// ─── Layouts ────────────────────────────────────────────────
 
 function AdminLayout({ children }) {
   return (
     <div>
       <AdminSidebar />
-
       <div className="ml-64">
         {children}
       </div>
@@ -66,25 +81,45 @@ function AdminLayout({ children }) {
   );
 }
 
+function MitraLayout({ children }) {
+  return (
+    <div>
+      <MitraSidebar />
+      <div className="ml-64">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Root Layout ────────────────────────────────────────────
+
 function Layout() {
   const location = useLocation();
 
-  const hideLayout =
-    location.pathname === "/login" ||
-    location.pathname === "/register";
+  const isMitraAuth =
+    location.pathname === "/mitra/login" ||
+    location.pathname === "/mitra/register";
+
+  const isMitraPage =
+    location.pathname.startsWith("/mitra") && !isMitraAuth;
 
   const isAdminPage =
     location.pathname.startsWith("/admin");
+
+  const hideLayout =
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    isMitraAuth;
 
   return (
     <div className="flex flex-col min-h-screen text-foreground">
 
       {/* NAVBAR */}
-      {!hideLayout &&
-        (isAdminPage ? <AdminNavbar /> : <Navbar />)}
+      {!hideLayout && !isMitraPage && (isAdminPage ? <AdminNavbar /> : <Navbar />)}
 
       {/* CONTENT */}
-      <main className="flex-1 pt-20">
+      <main className={`flex-1 ${!isMitraPage && !hideLayout ? "pt-20" : ""}`}>
         <Routes>
 
           {/* PUBLIC */}
@@ -101,7 +136,6 @@ function Layout() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/scan"
             element={
@@ -110,7 +144,6 @@ function Layout() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/profile"
             element={
@@ -119,7 +152,6 @@ function Layout() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/action"
             element={
@@ -140,7 +172,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/konfirmasi"
             element={
@@ -151,7 +182,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/user"
             element={
@@ -162,7 +192,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/partners"
             element={
@@ -173,7 +202,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/waste-data"
             element={
@@ -184,7 +212,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/ai-monitoring"
             element={
@@ -195,7 +222,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/action-tracking"
             element={
@@ -206,7 +232,6 @@ function Layout() {
               </AdminRoute>
             }
           />
-
           <Route
             path="/admin/content"
             element={
@@ -218,16 +243,60 @@ function Layout() {
             }
           />
 
-          {/* FALLBACK */}
+          {/* MITRA - PUBLIC */}
+          <Route path="/mitra/login" element={<MitraLogin />} />
+          <Route path="/mitra/register" element={<MitraRegister />} />
+
+          {/* MITRA - PROTECTED */}
           <Route
-            path="*"
-            element={<Navigate to="/" />}
+            path="/mitra/dashboard"
+            element={
+              <MitraRoute>
+                <MitraLayout>
+                  <MitraDashboard />
+                </MitraLayout>
+              </MitraRoute>
+            }
           />
+          <Route
+            path="/mitra/verifikasi"
+            element={
+              <MitraRoute>
+                <MitraLayout>
+                  <MitraVerifikasi />
+                </MitraLayout>
+              </MitraRoute>
+            }
+          />
+          <Route
+            path="/mitra/profil"
+            element={
+              <MitraRoute>
+                <MitraLayout>
+                  <MitraProfil />
+                </MitraLayout>
+              </MitraRoute>
+            }
+          />
+          <Route
+            path="/mitra/riwayat"
+            element={
+              <MitraRoute>
+                <MitraLayout>
+                  <MitraRiwayat />
+                </MitraLayout>
+              </MitraRoute>
+            }
+          />
+
+          {/* FALLBACK */}
+          <Route path="*" element={<Navigate to="/" />} />
+
         </Routes>
       </main>
 
       {/* FOOTER (hanya user/public) */}
-      {!hideLayout && !isAdminPage && (
+      {!hideLayout && !isAdminPage && !isMitraPage && (
         <footer className="text-center py-6 border-t bg-white">
           <p className="text-sm text-gray-400">
             © 2026{" "}

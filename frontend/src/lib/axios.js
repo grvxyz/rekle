@@ -7,16 +7,12 @@ const api = axios.create({
 });
 
 // ─── Singleton promise untuk refresh ───────────────────────
-// Mencegah race condition: refresh hanya dipanggil sekali,
-// semua request yang antre pakai hasil promise yang sama.
 let refreshPromise = null;
 
 async function refreshAccessToken() {
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) throw new Error("No refresh token available");
 
-  // Pakai axios langsung (bukan instance api) agar tidak
-  // masuk interceptor lagi dan menyebabkan infinite loop
   const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
     refresh_token: refreshToken,
   });
@@ -30,19 +26,23 @@ async function refreshAccessToken() {
 function forceLogout() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
-  localStorage.removeItem("is_superuser"); // ← tambahan
-  // Pakai replace agar halaman login tidak masuk history browser
+  localStorage.removeItem("is_superuser");
+  
+  // Menggunakan replace agar history login bersih
   window.location.replace("/login");
 }
 
 // ─── Request interceptor ───────────────────────────────────
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // ─── Response interceptor ──────────────────────────────────
 api.interceptors.response.use(
@@ -52,7 +52,6 @@ api.interceptors.response.use(
     const original = error.config;
 
     // Hanya handle 401, dan jangan retry endpoint refresh itu sendiri
-    // agar tidak infinite loop kalau refresh token juga expired
     if (
       error.response?.status === 401 &&
       !original._retry &&
@@ -61,8 +60,7 @@ api.interceptors.response.use(
       original._retry = true;
 
       try {
-        // Kalau refresh sedang berjalan, tunggu hasilnya —
-        // jangan buat request refresh baru (fix race condition)
+        // Handle singleton untuk mencegah tab ganda me-refresh bersamaan
         if (!refreshPromise) {
           refreshPromise = refreshAccessToken().finally(() => {
             refreshPromise = null;
@@ -71,15 +69,23 @@ api.interceptors.response.use(
 
         const newToken = await refreshPromise;
 
+        // Pasang token baru ke header request original
         original.headers.Authorization = `Bearer ${newToken}`;
+        
+        // FIX UNTUK MULTIPART FORM DATA:
+        // Jika request membawa FormData, beberapa browser memerlukan re-evaluation 
+        // terhadap headers content-type agar boundary boundary-nya tidak rusak.
+        if (original.data instanceof FormData) {
+          original.headers["Content-Type"] = "multipart/form-data";
+        }
+
+        // Jalankan ulang request yang sempat tertunda
         return api(original);
 
       } catch (refreshError) {
-        // Refresh token juga expired atau tidak valid
-        console.error("[api] Refresh token expired:", refreshError.message);
+        console.error("[api] Refresh token expired atau tidak valid:", refreshError.message);
         forceLogout();
-        // Tolak dengan error asli agar caller bisa handle jika perlu
-        return Promise.reject(error);
+        return Promise.reject(refreshError);
       }
     }
 

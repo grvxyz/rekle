@@ -8,17 +8,16 @@ from pydantic import BaseModel
 class ActionCreateSchema(BaseModel):
     prediction_id: int
     action_type: str
-    route: str                        # "mandiri" | "mitra"
+    route: str                              # "mandiri" | "mitra"
     partner_name: Optional[str] = None
     notes: Optional[str] = None
 
 
 # ─── Request: admin verifikasi ─────────────────────────────
 class ActionVerifySchema(BaseModel):
-    status: str                       # "approved" | "rejected"
-    notes: Optional[str] = None
-    # Diisi jika route = "mitra", estimasi berat sampah dalam gram
-    weight_gram: Optional[int] = None
+    status: str                             # "approved" | "rejected"
+    rejection_reason: Optional[str] = None  # wajib diisi jika status = "rejected"
+    weight_gram: Optional[int] = None       # diisi jika route = "mitra" + approved
 
 
 # ─── Response ──────────────────────────────────────────────
@@ -32,6 +31,7 @@ class ActionResponse(BaseModel):
     points_earned: int
     balance_earned: int
     status: str
+    rejection_reason: Optional[str]         # ditampilkan ke user jika rejected
     verified_by: Optional[int]
     verified_at: Optional[datetime]
     created_at: datetime

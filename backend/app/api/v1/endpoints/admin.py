@@ -3,15 +3,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
 from datetime import date, datetime, timedelta, timezone
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.models.user import User
 from app.models.prediction import Prediction
 from app.models.action import Action
+from app.models.mitra import Mitra
 from app.schemas.user_schema import UserResponse
 from app.api.v1.deps import get_current_superuser
 from app.models.content import Content
 from app.schemas.content_schema import ContentCreate, ContentUpdate, ContentResponse
+from app.schemas.prediction_schema import ScanHistory, ScanHistoryList
+from app.schemas.mitra_schema import MitraResponse
 
 router = APIRouter()
 
@@ -27,11 +31,6 @@ def admin_dashboard(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """
-    Ringkasan statistik keseluruhan aplikasi.
-    Semua metrik bisa difilter berdasarkan rentang tanggal.
-    """
-
     users_query = db.query(func.count(User.id))
     if start_date and end_date:
         users_query = users_query.filter(
@@ -53,8 +52,6 @@ def admin_dashboard(
         )
     total_actions = actions_query.scalar() or 0
 
-    # Filter berdasarkan Action.created_at agar poin yang
-    # dihitung sesuai periode, bukan tanggal registrasi user.
     points_query = db.query(func.sum(Action.points_earned))
     if start_date and end_date:
         points_query = points_query.filter(
@@ -78,11 +75,19 @@ def admin_dashboard(
         .all()
     )
 
+    # Mitra pending verifikasi
+    pending_mitras = (
+        db.query(func.count(Mitra.id))
+        .filter(Mitra.status == "pending")
+        .scalar() or 0
+    )
+
     return {
         "total_users": total_users,
         "total_scans": total_scans,
         "total_actions": total_actions,
         "total_points_distributed": total_points,
+        "pending_mitras": pending_mitras,
         "top_categories": [
             {"category": result, "count": count}
             for result, count in top_categories
@@ -111,15 +116,8 @@ def toggle_user_active(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_superuser),
 ):
-    """
-    Aktifkan atau nonaktifkan user.
-    Admin tidak bisa menonaktifkan diri sendiri.
-    """
     if user_id == current_admin.id:
-        raise HTTPException(
-            status_code=400,
-            detail="Tidak bisa mengubah status diri sendiri",
-        )
+        raise HTTPException(status_code=400, detail="Tidak bisa mengubah status diri sendiri")
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -137,15 +135,8 @@ def set_superuser(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_superuser),
 ):
-    """
-    Jadikan user sebagai superuser.
-    Admin tidak bisa mengubah role diri sendiri.
-    """
     if user_id == current_admin.id:
-        raise HTTPException(
-            status_code=400,
-            detail="Tidak bisa mengubah diri sendiri",
-        )
+        raise HTTPException(status_code=400, detail="Tidak bisa mengubah diri sendiri")
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -155,6 +146,118 @@ def set_superuser(
     db.commit()
     db.refresh(user)
     return user
+
+
+# =========================================================
+# SCANS - LIST SEMUA SCAN
+# =========================================================
+
+@router.get("/scans", response_model=ScanHistoryList)
+def list_all_scans(
+    skip: int = 0,
+    limit: int = 50,
+    result: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Admin: list semua hasil scan dari seluruh user."""
+    query = db.query(Prediction)
+
+    if result:
+        query = query.filter(Prediction.result == result)
+
+    total = query.count()
+    items = (
+        query
+        .order_by(Prediction.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return ScanHistoryList(total=total, items=items)
+
+
+# =========================================================
+# MITRA VERIFICATION
+# =========================================================
+
+class MitraVerifySchema(BaseModel):
+    status: str                             # "approved" | "rejected"
+    rejection_reason: Optional[str] = None  # wajib jika rejected
+
+
+@router.get("/mitra/pending", response_model=List[MitraResponse])
+def list_pending_mitras(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Admin: list semua mitra yang menunggu verifikasi pendaftaran."""
+    return (
+        db.query(Mitra)
+        .filter(Mitra.status == "pending")
+        .order_by(Mitra.created_at.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+@router.get("/mitra/pending/count")
+def count_pending_mitras(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Admin: jumlah mitra yang menunggu verifikasi."""
+    count = (
+        db.query(func.count(Mitra.id))
+        .filter(Mitra.status == "pending")
+        .scalar() or 0
+    )
+    return {"count": count}
+
+
+@router.patch("/mitra/{mitra_id}/verify", response_model=MitraResponse)
+def verify_mitra(
+    mitra_id: int,
+    payload: MitraVerifySchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser),
+):
+    """
+    Admin approve atau reject pendaftaran mitra.
+
+    Jika approved → mitra langsung aktif (is_active = True).
+    Jika rejected → rejection_reason wajib diisi.
+    """
+    if payload.status not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="status harus 'approved' atau 'rejected'")
+
+    if payload.status == "rejected" and not payload.rejection_reason:
+        raise HTTPException(status_code=400, detail="Alasan penolakan wajib diisi jika status rejected")
+
+    mitra = db.query(Mitra).filter(Mitra.id == mitra_id).first()
+    if not mitra:
+        raise HTTPException(status_code=404, detail="Mitra tidak ditemukan")
+
+    if mitra.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Mitra sudah berstatus '{mitra.status}'")
+
+    mitra.status = payload.status
+    mitra.rejection_reason = payload.rejection_reason
+    mitra.verified_by = current_user.id
+    mitra.verified_at = datetime.now(timezone.utc)
+
+    if payload.status == "approved":
+        mitra.is_active = True
+    else:
+        mitra.is_active = False
+
+    db.commit()
+    db.refresh(mitra)
+    return mitra
 
 
 # =========================================================
@@ -168,7 +271,6 @@ def scan_analytics(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Statistik scan berdasarkan kategori dan rekomendasi."""
     category_query = db.query(
         Prediction.result,
         func.count(Prediction.id).label("count"),
@@ -222,7 +324,6 @@ def action_analytics(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Statistik aksi berdasarkan tipe dan total poin yang dihasilkan."""
     query = db.query(
         Action.action_type,
         func.count(Action.id).label("count"),
@@ -265,10 +366,6 @@ def analytics_timeseries(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """
-    Data jumlah scan per hari dalam rentang tanggal tertentu.
-    Tanggal tanpa scan diisi dengan nilai 0.
-    """
     raw_data = (
         db.query(
             func.date(Prediction.created_at).label("date"),

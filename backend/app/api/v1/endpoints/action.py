@@ -31,6 +31,12 @@ def save_proof(image_bytes: bytes, content_type: str) -> str:
     return filepath
 
 
+# ─── PENTING: semua endpoint statis harus di atas /{action_id} ───
+# Jika /pending atau /pending/count diletakkan setelah /{action_id},
+# FastAPI akan menangkap string "pending" sebagai action_id integer
+# dan langsung return 422 Unprocessable Entity.
+
+
 # ─── 1. User buat aksi setelah scan ────────────────────────
 @router.post("/", response_model=ActionResponse, status_code=status.HTTP_201_CREATED)
 def create_action(
@@ -65,7 +71,60 @@ def create_action(
     return action
 
 
-# ─── 2. User upload bukti foto ──────────────────────────────
+# ─── 2. User lihat riwayat aksi ────────────────────────────
+@router.get("/", response_model=list[ActionResponse])
+def get_my_actions(
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Riwayat semua aksi milik user yang sedang login."""
+    return (
+        db.query(Action)
+        .filter(Action.user_id == current_user.id)
+        .order_by(Action.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+# ─── 3. Admin: jumlah aksi pending ─────────────────────────
+@router.get("/pending/count")
+def get_pending_count(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Admin: hitung total aksi yang masih menunggu verifikasi."""
+    count = (
+        db.query(Action)
+        .filter(Action.status == "pending")
+        .count()
+    )
+    return {"count": count}
+
+
+# ─── 4. Admin: lihat semua aksi pending ────────────────────
+@router.get("/pending", response_model=list[ActionResponse])
+def get_pending_actions(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser),
+):
+    """Admin: lihat semua aksi yang menunggu verifikasi."""
+    return (
+        db.query(Action)
+        .filter(Action.status == "pending")
+        .order_by(Action.created_at.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+# ─── 5. User upload bukti foto ──────────────────────────────
 @router.post("/{action_id}/proof", response_model=ActionResponse)
 async def upload_proof(
     action_id: int,
@@ -103,7 +162,7 @@ async def upload_proof(
     return action
 
 
-# ─── 3. Admin verifikasi ────────────────────────────────────
+# ─── 6. Admin verifikasi ────────────────────────────────────
 @router.patch("/{action_id}/verify", response_model=ActionWithRewardResponse)
 def verify_action(
     action_id: int,
@@ -114,15 +173,22 @@ def verify_action(
     """
     Admin approve atau reject aksi user.
 
+    Jika rejected → rejection_reason wajib diisi.
     Jika approved:
-      - Semua route    -> poin aksi (points_per_action = 50)
-      - Route 'mitra'  -> tambah saldo rupiah berdasarkan berat sampah
-                          (weight_gram / 1000 * balance_per_kg)
+      - Semua route    → poin aksi (points_per_action = 50)
+      - Route 'mitra'  → tambah saldo rupiah berdasarkan berat sampah
+                         (weight_gram / 1000 * balance_per_kg)
     """
     if payload.status not in ("approved", "rejected"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="status harus 'approved' atau 'rejected'",
+        )
+
+    if payload.status == "rejected" and not payload.rejection_reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Alasan penolakan wajib diisi jika status rejected",
         )
 
     action = db.query(Action).filter(Action.id == action_id).first()
@@ -142,16 +208,15 @@ def verify_action(
     action.status = payload.status
     action.verified_by = current_user.id
     action.verified_at = datetime.now(timezone.utc)
+    action.rejection_reason = payload.rejection_reason
 
     user = db.query(User).filter(User.id == action.user_id).first()
 
     if payload.status == "approved":
-        # Semua aksi yang diverifikasi dapat poin
         action.points_earned = settings.points_per_action
         user.total_points = (user.total_points or 0) + settings.points_per_action
         user.action_count = (user.action_count or 0) + 1
 
-        # Khusus route mitra: tambah saldo rupiah
         if action.route == "mitra" and payload.weight_gram:
             balance = (payload.weight_gram / 1000) * settings.balance_per_kg
             action.balance_earned = int(balance)
@@ -165,56 +230,3 @@ def verify_action(
         total_points=user.total_points,
         total_balance=user.balance,
     )
-
-
-# ─── 4. User lihat riwayat aksi ────────────────────────────
-@router.get("/", response_model=list[ActionResponse])
-def get_my_actions(
-    skip: int = 0,
-    limit: int = 20,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Riwayat semua aksi milik user yang sedang login."""
-    return (
-        db.query(Action)
-        .filter(Action.user_id == current_user.id)
-        .order_by(Action.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-
-# ─── 5. Admin lihat semua aksi pending ─────────────────────
-@router.get("/pending", response_model=list[ActionResponse])
-def get_pending_actions(
-    skip: int = 0,
-    limit: int = 50,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_superuser),
-):
-    """Admin: lihat semua aksi yang menunggu verifikasi."""
-    return (
-        db.query(Action)
-        .filter(Action.status == "pending")
-        .order_by(Action.created_at.asc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-
-# ─── 6. Admin: jumlah aksi pending (untuk badge sidebar) ───
-@router.get("/pending/count")
-def get_pending_count(
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_superuser),
-):
-    """Admin: hitung total aksi yang masih menunggu verifikasi."""
-    count = (
-        db.query(Action)
-        .filter(Action.status == "pending")
-        .count()
-    )
-    return {"count": count}

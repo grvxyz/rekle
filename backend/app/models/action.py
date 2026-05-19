@@ -42,6 +42,9 @@ class Action(Base):
     # pending | approved | rejected
     status: Mapped[str] = mapped_column(String(50), default="pending")
 
+    # Alasan penolakan — wajib diisi admin jika status = rejected
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     verified_by: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

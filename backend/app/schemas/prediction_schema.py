@@ -20,7 +20,6 @@ class ScanResult(BaseModel):
     all_scores: Dict[str, float]
     image_path: Optional[str] = None
     top2: List[Top2Prediction] = []
-    # Poin scan yang langsung diberikan
     points_earned: int = 0
 
     model_config = {"from_attributes": True}
@@ -29,8 +28,10 @@ class ScanResult(BaseModel):
 class ScanHistory(BaseModel):
     """Satu item riwayat scan."""
     id: int
+    user_id: int                  # dipakai DataSampah.jsx → tampil sebagai User #id
     result: str
     confidence: Optional[float]
+    is_confident: Optional[bool]  # dipakai DataSampah.jsx → status AI (Akurat/Kurang Yakin)
     recommendation: Optional[str]
     image_path: Optional[str]
     created_at: datetime
@@ -39,7 +40,7 @@ class ScanHistory(BaseModel):
 
 
 class ScanHistoryList(BaseModel):
-    """Response GET /scan/history."""
+    """Response GET /scan/history dan GET /admin/scans."""
     total: int
     items: List[ScanHistory]
 
