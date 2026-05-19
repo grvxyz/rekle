@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import logo from "../../logo.svg";
 import Button from "../../components/ui/button.jsx";
 import {
@@ -12,28 +13,26 @@ import {
 import { Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react";
 import Input from "../../components/ui/input.jsx";
 import Label from "../../components/ui/label.jsx";
+import api from "@/lib/axios";
 
 function RegisterPage() {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
 
-  // STATE
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [city, setCity] = useState("");
-  const [bio, setBio] = useState("");
+  const [email, setEmail]       = useState("");
+  const [phone, setPhone]       = useState("");
+  const [city, setCity]         = useState("");
+  const [bio, setBio]           = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // HANDLE REGISTER
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // 🔥 VALIDASI FRONTEND
     if (password.length < 8) {
       setError("Password minimal 8 karakter");
       setLoading(false);
@@ -41,44 +40,24 @@ function RegisterPage() {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          full_name: fullName.trim(),
-          password: password,
-          phone_number: phone.trim() || null,
-          city: city.trim() || null,
-          bio: bio.trim() || null,
-        }),
+      await api.post("/auth/register", {
+        email:        email.trim(),
+        full_name:    fullName.trim(),
+        password:     password,
+        phone_number: phone.trim() || null,
+        city:         city.trim() || null,
+        bio:          bio.trim() || null,
       });
 
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = { detail: "Server tidak merespons JSON" };
-      }
-
-      console.log("STATUS:", res.status);
-      console.log("DATA:", data);
-
-      if (!res.ok) {
-        throw new Error(data.detail || "Register gagal");
-      }
-
-      // ✅ SUCCESS
-      alert("Registrasi berhasil!");
-
-      // 🔥 redirect lebih proper
-      window.location.replace("/login");
+      navigate("/login");
 
     } catch (err) {
       console.error(err);
-      setError(err.message || "Terjadi kesalahan");
+      setError(
+        err.response?.data?.detail ||
+        err.message ||
+        "Terjadi kesalahan"
+      );
     } finally {
       setLoading(false);
     }
@@ -88,7 +67,6 @@ function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-6">
       <div className="w-full max-w-md">
 
-        {/* LOGO */}
         <div className="mb-8 flex justify-center">
           <a href="/" className="flex items-center gap-3">
             <img src={logo} alt="Logo" className="h-12 w-12 rounded-2xl" />
@@ -96,13 +74,9 @@ function RegisterPage() {
           </a>
         </div>
 
-        {/* CARD */}
         <Card className="rounded-2xl shadow-lg">
-
           <CardHeader className="pb-2">
-            <CardTitle className="text-2xl font-bold">
-              Daftar
-            </CardTitle>
+            <CardTitle className="text-2xl font-bold">Daftar</CardTitle>
             <CardDescription>
               Buat akun baru untuk mulai menggunakan aplikasi.
             </CardDescription>
@@ -111,7 +85,6 @@ function RegisterPage() {
           <CardContent>
             <form className="space-y-3" onSubmit={handleRegister}>
 
-              {/* NAME */}
               <div className="space-y-2">
                 <Label>Nama</Label>
                 <div className="relative">
@@ -126,7 +99,6 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* EMAIL */}
               <div className="space-y-2">
                 <Label>Email</Label>
                 <div className="relative">
@@ -142,7 +114,6 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* PHONE */}
               <div className="space-y-2">
                 <Label>Nomor Telepon</Label>
                 <div className="relative">
@@ -157,7 +128,6 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* CITY */}
               <div className="space-y-2">
                 <Label>Kota</Label>
                 <Input
@@ -168,7 +138,6 @@ function RegisterPage() {
                 />
               </div>
 
-              {/* BIO (FIX: pakai textarea) */}
               <div className="space-y-2">
                 <Label>Bio</Label>
                 <textarea
@@ -179,7 +148,6 @@ function RegisterPage() {
                 />
               </div>
 
-              {/* PASSWORD */}
               <div className="space-y-2">
                 <Label>Password</Label>
                 <div className="relative">
@@ -201,14 +169,10 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* ERROR */}
               {error && (
-                <p className="text-red-500 text-sm text-center">
-                  {error}
-                </p>
+                <p className="text-red-500 text-sm text-center">{error}</p>
               )}
 
-              {/* BUTTON */}
               <Button className="w-full h-10" type="submit" disabled={loading}>
                 {loading ? "Loading..." : "Daftar"}
               </Button>
@@ -224,7 +188,6 @@ function RegisterPage() {
               </a>
             </p>
           </CardFooter>
-
         </Card>
       </div>
     </div>

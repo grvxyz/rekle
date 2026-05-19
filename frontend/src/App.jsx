@@ -18,7 +18,11 @@ import LandingPage from "./pages/landing/LandingPage.jsx";
 import ScanPage from "./pages/scan/ScanPage";
 import UserDashboard from "./pages/dashboard/Dashboard.jsx";
 import Profile from "./pages/profile/Profile.jsx";
+import HistoryPage from "./pages/history/HistoryPage.jsx";
 import ActionPage from "./pages/action/ActionPage";
+import ReusePage from "./pages/action/ReusePage";
+import RecyclePage from "./pages/action/RecyclePage";
+import BankSampahPage from "./pages/action/BankSampahPage";
 
 import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import KonfirmasiAksi from "./pages/admin/konfirmasi/KonfirmasiAksi.jsx";
@@ -36,7 +40,7 @@ import MitraVerifikasi from "./pages/mitra/MitraVerifikasi.jsx";
 import MitraProfil from "./pages/mitra/MitraProfil.jsx";
 import MitraRiwayat from "./pages/mitra/MitraRiwayat.jsx";
 
-// ─── Route Guards ───────────────────────────────────────────
+// ─── Route Guards ────────────────────────────────────────────
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("access_token");
@@ -68,15 +72,13 @@ function MitraRoute({ children }) {
   return children;
 }
 
-// ─── Layouts ────────────────────────────────────────────────
+// ─── Layouts ─────────────────────────────────────────────────
 
 function AdminLayout({ children }) {
   return (
     <div>
       <AdminSidebar />
-      <div className="ml-64">
-        {children}
-      </div>
+      <div className="ml-64">{children}</div>
     </div>
   );
 }
@@ -85,14 +87,12 @@ function MitraLayout({ children }) {
   return (
     <div>
       <MitraSidebar />
-      <div className="ml-64">
-        {children}
-      </div>
+      <div className="ml-64">{children}</div>
     </div>
   );
 }
 
-// ─── Root Layout ────────────────────────────────────────────
+// ─── Root Layout ──────────────────────────────────────────────
 
 function Layout() {
   const location = useLocation();
@@ -104,8 +104,7 @@ function Layout() {
   const isMitraPage =
     location.pathname.startsWith("/mitra") && !isMitraAuth;
 
-  const isAdminPage =
-    location.pathname.startsWith("/admin");
+  const isAdminPage = location.pathname.startsWith("/admin");
 
   const hideLayout =
     location.pathname === "/login" ||
@@ -153,10 +152,42 @@ function Layout() {
             }
           />
           <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/action"
             element={
               <ProtectedRoute>
                 <ActionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/action/reuse"
+            element={
+              <ProtectedRoute>
+                <ReusePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/action/recycle"
+            element={
+              <ProtectedRoute>
+                <RecyclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/action/bank-sampah"
+            element={
+              <ProtectedRoute>
+                <BankSampahPage />
               </ProtectedRoute>
             }
           />
@@ -295,14 +326,12 @@ function Layout() {
         </Routes>
       </main>
 
-      {/* FOOTER (hanya user/public) */}
+      {/* FOOTER */}
       {!hideLayout && !isAdminPage && !isMitraPage && (
         <footer className="text-center py-6 border-t bg-white">
           <p className="text-sm text-gray-400">
             © 2026{" "}
-            <span className="font-semibold text-green-800">
-              REKLE
-            </span>
+            <span className="font-semibold text-green-800">REKLE</span>
             . Bangun kebiasaan ramah lingkungan.
           </p>
         </footer>

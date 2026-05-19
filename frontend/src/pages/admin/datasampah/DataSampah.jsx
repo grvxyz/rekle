@@ -47,6 +47,17 @@ function getConfidenceColor(confidence) {
   return "bg-red-400";
 }
 
+// ── Build URL gambar dari path relatif atau absolut ────────
+const BASE_MEDIA_URL = "http://127.0.0.1:8000";
+
+function buildImageUrl(path) {
+  if (!path) return null;
+  // Sudah full URL, pakai langsung
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  // Hilangkan leading slash agar tidak double slash
+  return `${BASE_MEDIA_URL}/${path.replace(/^\/+/, "")}`;
+}
+
 // ======================================================
 // SKELETON
 // ======================================================
@@ -54,7 +65,7 @@ function getConfidenceColor(confidence) {
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-100">
-      {[...Array(6)].map((_, i) => (
+      {[...Array(7)].map((_, i) => (
         <td key={i} className="px-4 py-4">
           <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: i === 0 ? 40 : i === 3 ? 120 : 80 }} />
         </td>
@@ -68,10 +79,13 @@ function SkeletonRow() {
 // ======================================================
 
 function ImageThumb({ path }) {
-  const [error, setError] = useState(false);
-  const src = path ? `http://127.0.0.1:8000/${path}` : null;
+  const [hasError, setHasError] = useState(false);
+  const src = buildImageUrl(path);
 
-  if (!src || error) {
+  // Reset error state kalau path berubah
+  useEffect(() => { setHasError(false); }, [path]);
+
+  if (!src || hasError) {
     return (
       <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
         <ImageIcon className="w-5 h-5 text-gray-400" />
@@ -84,7 +98,7 @@ function ImageThumb({ path }) {
       src={src}
       alt="scan"
       className="w-12 h-12 rounded-xl object-cover border border-gray-200"
-      onError={() => setError(true)}
+      onError={() => setHasError(true)}
     />
   );
 }
@@ -94,13 +108,13 @@ function ImageThumb({ path }) {
 // ======================================================
 
 const DataSampah = () => {
-  const [scans, setScans]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState("");
-  const [search, setSearch]       = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [scans, setScans]                   = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState("");
+  const [search, setSearch]                 = useState("");
+  const [filterOpen, setFilterOpen]         = useState(false);
   const [filterCategory, setFilterCategory] = useState("semua");
-  const [total, setTotal]         = useState(0);
+  const [total, setTotal]                   = useState(0);
 
   // ======================================================
   // FETCH
@@ -111,15 +125,11 @@ const DataSampah = () => {
       setLoading(true);
       setError("");
 
-      // Admin menggunakan endpoint scan history semua user
-      // GET /api/v1/admin/scans (jika tersedia) atau fallback ke scan/history
-      // Coba endpoint admin dulu
       let data;
       try {
         const res = await api.get("/admin/scans", { params: { skip: 0, limit: 50 } });
         data = res.data;
       } catch {
-        // Fallback: pakai scan history milik admin sendiri
         const res = await api.get("/scan/history", { params: { skip: 0, limit: 50 } });
         data = res.data;
       }
@@ -130,17 +140,15 @@ const DataSampah = () => {
 
     } catch (err) {
       console.error("Fetch scans error:", err);
-      if (err.response?.status === 401) setError("Silakan login terlebih dahulu.");
+      if (err.response?.status === 401)      setError("Silakan login terlebih dahulu.");
       else if (err.response?.status === 403) setError("Akses admin ditolak.");
-      else setError("Gagal mengambil data scan.");
+      else                                   setError("Gagal mengambil data scan.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchScans();
-  }, [fetchScans]);
+  useEffect(() => { fetchScans(); }, [fetchScans]);
 
   // ======================================================
   // FILTER & SEARCH
@@ -159,10 +167,7 @@ const DataSampah = () => {
     return matchSearch && matchCategory;
   });
 
-  const categoryOptions = [
-    "semua",
-    ...Object.keys(CATEGORY_CONFIG),
-  ];
+  const categoryOptions = ["semua", ...Object.keys(CATEGORY_CONFIG)];
 
   // ======================================================
   // RENDER
@@ -181,8 +186,6 @@ const DataSampah = () => {
         {/* ── SEARCH & FILTER BAR ── */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-
-            {/* Search */}
             <div className="flex items-center gap-2 flex-1 text-gray-400">
               <Search className="w-4 h-4 shrink-0" />
               <input
@@ -193,8 +196,6 @@ const DataSampah = () => {
                 className="flex-1 bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
               />
             </div>
-
-            {/* Filter Toggle */}
             <button
               onClick={() => setFilterOpen(!filterOpen)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition
@@ -207,7 +208,6 @@ const DataSampah = () => {
             </button>
           </div>
 
-          {/* Filter Dropdown */}
           {filterOpen && (
             <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-gray-100 bg-gray-50 rounded-b-2xl">
               {categoryOptions.map((cat) => {
@@ -256,10 +256,8 @@ const DataSampah = () => {
 
               <tbody className="divide-y divide-gray-50">
 
-                {/* Loading */}
                 {loading && [...Array(6)].map((_, i) => <SkeletonRow key={i} />)}
 
-                {/* Empty */}
                 {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-16 text-center text-gray-400 text-sm">
@@ -270,7 +268,6 @@ const DataSampah = () => {
                   </tr>
                 )}
 
-                {/* Rows */}
                 {!loading && filtered.map((item) => {
                   const catCfg   = getCategoryConfig(item.result);
                   const pct      = item.confidence ? (item.confidence * 100).toFixed(1) : 0;
@@ -278,10 +275,8 @@ const DataSampah = () => {
                   const recLabel = RECOMMENDATION_LABEL[item.recommendation] || item.recommendation || "-";
 
                   return (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+
                       {/* Gambar */}
                       <td className="px-4 py-3">
                         <ImageThumb path={item.image_path} />
@@ -349,12 +344,9 @@ const DataSampah = () => {
             </table>
           </div>
 
-          {/* ── FOOTER ── */}
           {!loading && (
             <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
-              <span>
-                Menampilkan {filtered.length} dari {total} scan
-              </span>
+              <span>Menampilkan {filtered.length} dari {total} scan</span>
               <div className="flex items-center gap-1.5 text-gray-400">
                 <Brain className="w-3.5 h-3.5" />
                 <span>MobileNetV2</span>
