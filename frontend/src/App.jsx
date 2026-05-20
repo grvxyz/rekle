@@ -79,7 +79,7 @@ function Layout() {
         (isAdminPage ? <AdminNavbar /> : <Navbar />)}
 
       {/* CONTENT */}
-      <main className="flex-1 pt-20">
+      <main className={`flex-1 ${hideLayout ? "" : "pt-18"}`}>
         <Routes>
 
           {/* PUBLIC */}

@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   CheckCircle,
   Database,
@@ -8,57 +8,36 @@ import {
   FileText,
   BarChart3,
   Users,
+  LogOut,
 } from "lucide-react";
 
 const menu = [
-  {
-    label: "Analitik",
-    path: "/admin/dashboard",
-    icon: BarChart3,
-  },
-  {
-    label: "Persetujuan Aksi",
-    path: "/admin/konfirmasi",
-    icon: CheckCircle,
-    badge: 6,
-  },
-  {
-    label: "Data Pengguna",
-    path: "/admin/user",
-    icon: Users,
-  },
-  {
-    label: "Data Mitra",
-    path: "/admin/partners",
-    icon: Handshake,
-  },
-  {
-    label: "Data Sampah",
-    path: "/admin/waste-data",
-    icon: Database,
-  },
-  {
-    label: "Monitoring AI",
-    path: "/admin/ai-monitoring",
-    icon: Brain,
-  },
-  {
-    label: "Pelacakan Aksi",
-    path: "/admin/action-tracking",
-    icon: ClipboardList,
-  },
-  {
-    label: "Konten",
-    path: "/admin/content",
-    icon: FileText,
-  },
+  { label: "Dashboard", path: "/admin/dashboard", icon: BarChart3 },
+  { label: "Persetujuan Aksi", path: "/admin/konfirmasi", icon: CheckCircle, badge: 6 },
+  { label: "Data Pengguna", path: "/admin/user", icon: Users },
+  { label: "Data Mitra", path: "/admin/partners", icon: Handshake },
+  { label: "Data Sampah", path: "/admin/waste-data", icon: Database },
+  { label: "Monitoring AI", path: "/admin/ai-monitoring", icon: Brain },
+  { label: "Pelacakan Aksi", path: "/admin/action-tracking", icon: ClipboardList },
+  { label: "Konten", path: "/admin/content", icon: FileText },
 ];
 
 function AdminSidebar() {
-  return (
-    <aside className="fixed left-0 top-20 w-64 h-[calc(100vh-80px)] bg-white border-r p-4 overflow-y-auto">
+  const navigate = useNavigate();
 
-      <nav className="space-y-2">
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("is_superuser");
+
+    navigate("/login");
+  };
+
+  return (
+    <aside className="fixed left-0 top-20 w-64 h-[calc(100vh-80px)] bg-white border-r flex flex-col">
+
+      {/* MENU */}
+      <nav className="space-y-2 p-4 flex-1 overflow-y-auto">
         {menu.map((item) => {
           const Icon = item.icon;
 
@@ -92,6 +71,18 @@ function AdminSidebar() {
           );
         })}
       </nav>
+
+      {/* LOGOUT SECTION */}
+      <div className="p-4 border-t">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition"
+        >
+          <LogOut className="w-5 h-5" />
+          <span>Logout</span>
+        </button>
+      </div>
+
     </aside>
   );
 }
