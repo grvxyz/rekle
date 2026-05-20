@@ -2,8 +2,15 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Recycle, Clock, ArrowLeft, Camera } from "lucide-react";
 import api from "@/lib/axios";
+import {
+  CATEGORY_LABEL,
+  RECYCLE_INFO,
+  DEFAULT_INFO,
+} from "@/constants/wasteConstants";
 
-// ... RECYCLE_INFO, DEFAULT_INFO, CATEGORY_LABEL tetap sama ...
+// ======================================================
+// RECYCLE PAGE
+// ======================================================
 
 const RecyclePage = () => {
   const navigate     = useNavigate();
@@ -35,7 +42,7 @@ const RecyclePage = () => {
       setLoading(true);
       setError("");
       const { data } = await api.post("/actions/", {
-        action_type:   "daur_ulang",
+        action_type:   "daur_ulang",  // sinkron dengan backend
         route:         "mandiri",
         prediction_id: predictionId,
         partner_name:  partnerName.trim() || undefined,
@@ -91,13 +98,20 @@ const RecyclePage = () => {
   };
 
   if (step === "done") return (
-    <PendingBanner onHome={() => navigate("/dashboard")} onHistory={() => navigate("/history")} />
+    <PendingBanner
+      onHome={() => navigate("/dashboard")}
+      onHistory={() => navigate("/history")}
+    />
   );
 
   return (
     <section className="min-h-screen bg-slate-50 py-12 px-6">
       <div className="max-w-2xl mx-auto space-y-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+        >
           <ArrowLeft size={16} /> Kembali
         </button>
 
@@ -106,10 +120,13 @@ const RecyclePage = () => {
             <Recycle className="w-8 h-8 text-emerald-600" />
           </div>
           <h1 className="text-3xl font-bold text-slate-800">Daur Ulang</h1>
-          <p className="text-slate-500">Panduan mendaur ulang <span className="font-semibold text-slate-700">{wasteLabel}</span></p>
+          <p className="text-slate-500">
+            Panduan mendaur ulang{" "}
+            <span className="font-semibold text-slate-700">{wasteLabel}</span>
+          </p>
         </div>
 
-        <StepIndicator step={step} color="emerald" />
+        <StepIndicator step={step} />
 
         {step === "form" && (
           <>
@@ -119,7 +136,9 @@ const RecyclePage = () => {
               <ol className="space-y-3">
                 {info.steps.map((s, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
                     <p className="text-sm text-slate-600 leading-relaxed">{s}</p>
                   </li>
                 ))}
@@ -128,9 +147,13 @@ const RecyclePage = () => {
 
             <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
               <h2 className="font-semibold text-slate-700">Sudah mendaur ulang?</h2>
-              <p className="text-sm text-slate-500">Isi keterangan — foto bukti diminta di langkah berikutnya.</p>
+              <p className="text-sm text-slate-500">
+                Isi keterangan — foto bukti diminta di langkah berikutnya.
+              </p>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600">Nama bank sampah / fasilitas (opsional)</label>
+                <label className="text-xs font-medium text-slate-600">
+                  Nama bank sampah / fasilitas (opsional)
+                </label>
                 <input
                   type="text"
                   value={partnerName}
@@ -165,11 +188,17 @@ const RecyclePage = () => {
         {step === "proof" && (
           <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
             <h2 className="font-semibold text-slate-700">Upload Foto Bukti</h2>
-            <p className="text-sm text-slate-500">Foto saat menyerahkan sampah ke fasilitas daur ulang.</p>
+            <p className="text-sm text-slate-500">
+              Foto saat menyerahkan sampah ke fasilitas daur ulang.
+            </p>
 
             {proofPreview ? (
               <div className="relative">
-                <img src={proofPreview} alt="Preview bukti" className="w-full h-56 object-cover rounded-xl border" />
+                <img
+                  src={proofPreview}
+                  alt="Preview bukti"
+                  className="w-full h-56 object-cover rounded-xl border"
+                />
                 <button
                   onClick={() => { setProofFile(null); setProofPreview(null); }}
                   className="absolute top-2 right-2 bg-white border rounded-full px-2 py-1 text-xs text-slate-600 hover:bg-red-50 hover:text-red-500"
@@ -184,7 +213,7 @@ const RecyclePage = () => {
                 <span className="text-xs text-slate-400 mt-1">JPG, PNG, WEBP</span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                   onChange={(e) => handleProofFile(e.target.files[0])}
                 />
@@ -206,23 +235,25 @@ const RecyclePage = () => {
   );
 };
 
-const StepIndicator = ({ step, color = "amber" }) => {
-  const steps = ["form", "proof", "done"];
+// ── Step Indicator ─────────────────────────────────────────
+const StepIndicator = ({ step }) => {
+  const steps  = ["form", "proof", "done"];
   const labels = ["Keterangan", "Foto Bukti", "Selesai"];
   const current = steps.indexOf(step);
-  const active = color === "emerald" ? "bg-emerald-600 text-white" : "bg-amber-500 text-white";
-  const activeText = color === "emerald" ? "text-emerald-600 font-medium" : "text-amber-600 font-medium";
-  const activeLine = color === "emerald" ? "bg-emerald-400" : "bg-amber-400";
   return (
     <div className="flex items-center justify-center gap-2">
       {steps.map((s, i) => (
         <div key={s} className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${i <= current ? active : "bg-slate-200 text-slate-400"}`}>
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+            i <= current ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-400"
+          }`}>
             {i + 1}
           </div>
-          <span className={`text-xs ${i <= current ? activeText : "text-slate-400"}`}>{labels[i]}</span>
+          <span className={`text-xs ${i <= current ? "text-emerald-600 font-medium" : "text-slate-400"}`}>
+            {labels[i]}
+          </span>
           {i < steps.length - 1 && (
-            <div className={`w-8 h-0.5 ${i < current ? activeLine : "bg-slate-200"}`} />
+            <div className={`w-8 h-0.5 ${i < current ? "bg-emerald-400" : "bg-slate-200"}`} />
           )}
         </div>
       ))}
@@ -230,6 +261,7 @@ const StepIndicator = ({ step, color = "amber" }) => {
   );
 };
 
+// ── Pending Banner ─────────────────────────────────────────
 const PendingBanner = ({ onHome, onHistory }) => (
   <section className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
     <div className="max-w-sm w-full bg-white rounded-2xl shadow-sm border p-8 text-center space-y-4">
@@ -239,8 +271,18 @@ const PendingBanner = ({ onHome, onHistory }) => (
         Aksimu sedang menunggu verifikasi admin. Poin akan otomatis ditambahkan setelah disetujui.
       </p>
       <div className="flex gap-3 pt-2">
-        <button onClick={onHistory} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Lihat Riwayat</button>
-        <button onClick={onHome} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors">Ke Dashboard</button>
+        <button
+          onClick={onHistory}
+          className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+        >
+          Lihat Riwayat
+        </button>
+        <button
+          onClick={onHome}
+          className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
+        >
+          Ke Dashboard
+        </button>
       </div>
     </div>
   </section>

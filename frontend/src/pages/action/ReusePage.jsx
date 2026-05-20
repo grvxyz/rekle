@@ -2,7 +2,22 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles, Clock, ArrowLeft, Camera } from "lucide-react";
 import api from "@/lib/axios";
-import { CATEGORY_LABEL, REUSE_TIPS, DEFAULT_TIPS } from "@/constants/wasteConstants";
+import {
+  CATEGORY_LABEL,
+  REUSE_TIPS,
+  DEFAULT_TIPS,
+  RECOMMENDATION_MAP,
+} from "@/constants/wasteConstants";
+
+// ─── Petakan kategori sampah ke action_type backend ────────
+// Sinkron dengan app/ml/recommendation.py _RECOMMENDATION_MAP
+// action_type yang diterima: kompos | daur_ulang | eco_brick | reuse | khusus
+const getActionType = (result) => {
+  const rec = RECOMMENDATION_MAP[result];
+  // ReusePage menangani: reuse, kompos, eco_brick
+  if (["reuse", "kompos", "eco_brick"].includes(rec)) return rec;
+  return "reuse"; // fallback
+};
 
 // ======================================================
 // REUSE PAGE
@@ -15,6 +30,7 @@ const ReusePage = () => {
   const predictionId = location.state?.prediction_id ?? null;
   const wasteLabel   = result ? (CATEGORY_LABEL[result] ?? result) : "sampah";
   const tips         = result ? (REUSE_TIPS[result] ?? DEFAULT_TIPS) : DEFAULT_TIPS;
+  const actionType   = getActionType(result);
 
   // step: "form" | "proof" | "done"
   const [step, setStep]         = useState("form");
@@ -41,7 +57,7 @@ const ReusePage = () => {
       setLoading(true);
       setError("");
       const { data } = await api.post("/actions/", {
-        action_type:   "reuse",
+        action_type:   actionType,   // kompos | reuse | eco_brick
         route:         "mandiri",
         prediction_id: predictionId,
         notes:         notes.trim() || undefined,
@@ -104,6 +120,16 @@ const ReusePage = () => {
     />
   );
 
+  const pageTitle =
+    actionType === "kompos"    ? "Buat Kompos" :
+    actionType === "eco_brick" ? "Eco Brick" :
+    "Reuse / Kerajinan";
+
+  const pageSubtitle =
+    actionType === "kompos"    ? "Cara mengolah" :
+    actionType === "eco_brick" ? "Cara membuat eco brick dari" :
+    "Ide kreatif untuk mengolah";
+
   // ── Render: utama ──────────────────────────────────────
   return (
     <section className="min-h-screen bg-slate-50 py-12 px-6">
@@ -120,9 +146,9 @@ const ReusePage = () => {
           <div className="w-16 h-16 mx-auto bg-amber-100 rounded-full flex items-center justify-center">
             <Sparkles className="w-8 h-8 text-amber-600" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800">Reuse / Kerajinan</h1>
+          <h1 className="text-3xl font-bold text-slate-800">{pageTitle}</h1>
           <p className="text-slate-500">
-            Ide kreatif untuk mengolah{" "}
+            {pageSubtitle}{" "}
             <span className="font-semibold text-slate-700">{wasteLabel}</span>
           </p>
         </div>
@@ -145,7 +171,7 @@ const ReusePage = () => {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
-              <h2 className="font-semibold text-slate-700">Sudah melakukan reuse?</h2>
+              <h2 className="font-semibold text-slate-700">Sudah dilakukan?</h2>
               <p className="text-sm text-slate-500">
                 Tulis keterangan singkat — kamu akan diminta upload foto bukti di langkah berikutnya.
               </p>
@@ -174,7 +200,7 @@ const ReusePage = () => {
           <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
             <h2 className="font-semibold text-slate-700">Upload Foto Bukti</h2>
             <p className="text-sm text-slate-500">
-              Foto hasil kerajinan atau proses reuse kamu. Diperlukan untuk verifikasi admin.
+              Foto hasil kerajinan atau proses {pageTitle.toLowerCase()} kamu. Diperlukan untuk verifikasi admin.
             </p>
 
             {proofPreview ? (
@@ -198,7 +224,7 @@ const ReusePage = () => {
                 <span className="text-xs text-slate-400 mt-1">JPG, PNG, WEBP</span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                   onChange={(e) => handleProofFile(e.target.files[0])}
                 />
@@ -223,8 +249,8 @@ const ReusePage = () => {
 
 // ── Step Indicator ─────────────────────────────────────────
 const StepIndicator = ({ step }) => {
-  const steps   = ["form", "proof", "done"];
-  const labels  = ["Keterangan", "Foto Bukti", "Selesai"];
+  const steps  = ["form", "proof", "done"];
+  const labels = ["Keterangan", "Foto Bukti", "Selesai"];
   const current = steps.indexOf(step);
   return (
     <div className="flex items-center justify-center gap-2">
