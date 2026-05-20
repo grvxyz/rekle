@@ -3,7 +3,7 @@ import ProfileForm from "../../components/profile/ProfileForm.jsx";
 
 function Profile() {
   const [form, setForm] = useState(null);
-  const token = localStorage.getItem("access_token");
+  const token = sessionStorage.getItem("access_token");
 
   useEffect(() => {
     const fetchUser = async () => {

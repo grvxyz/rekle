@@ -1,21 +1,33 @@
+/**
+ * pages/action/BankSampahPage.jsx
+ *
+ * Perubahan:
+ * - Bisa diakses guest — daftar mitra tetap tampil (info publik).
+ * - Tombol "Catat Setor Sampah" (klaim poin) diganti GuestClaimBlock untuk guest.
+ * - Fetch mitra tetap berjalan tanpa auth (endpoint mitra perlu diizinkan, atau
+ *   kita tangani 401 dengan graceful fallback).
+ */
+
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapPin, Phone, Globe, CheckCircle, Clock, ArrowLeft, Camera } from "lucide-react";
 import api from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
+import GuestClaimBlock from "@/components/scan/GuestClaimBlock";
 
 // ======================================================
 // KONSTANTA
 // ======================================================
 
 const CATEGORY_LABEL = {
-  organik: "Sampah Organik",
-  plastik_pet: "Plastik PET",
-  plastik_hdpe: "Plastik HDPE",
+  organik:          "Sampah Organik",
+  plastik_pet:      "Plastik PET",
+  plastik_hdpe:     "Plastik HDPE",
   plastik_campuran: "Plastik Campuran",
-  kertas_bersih: "Kertas Bersih",
-  kertas_kotor: "Kertas Kotor",
-  kaca_utuh: "Kaca Utuh",
-  kaca_pecah: "Kaca Pecah",
+  kertas_bersih:    "Kertas Bersih",
+  kertas_kotor:     "Kertas Kotor",
+  kaca_utuh:        "Kaca Utuh",
+  kaca_pecah:       "Kaca Pecah",
 };
 
 // ======================================================
@@ -23,32 +35,34 @@ const CATEGORY_LABEL = {
 // ======================================================
 
 const BankSampahPage = () => {
-  const navigate     = useNavigate();
-  const location     = useLocation();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const { isLoggedIn } = useAuth();
+
   const result       = location.state?.result ?? null;
   const predictionId = location.state?.prediction_id ?? null;
   const wasteLabel   = result ? (CATEGORY_LABEL[result] ?? result) : null;
 
   // Data mitra
-  const [mitras, setMitras]     = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [mitras,   setMitras]   = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState("");
 
   // Seleksi & log
   const [selectedMitra, setSelectedMitra] = useState(null);
-  const [notes, setNotes]                 = useState("");
-  const [logLoading, setLogLoading]       = useState(false);
-  const [logError, setLogError]           = useState("");
+  const [notes,         setNotes]         = useState("");
+  const [logLoading,    setLogLoading]    = useState(false);
+  const [logError,      setLogError]      = useState("");
 
   // Alur step: "list" → "proof" → "done"
-  const [step, setStep]         = useState("list");
+  const [step,     setStep]     = useState("list");
   const [actionId, setActionId] = useState(null);
 
   // Bukti foto
-  const [proofFile, setProofFile]       = useState(null);
+  const [proofFile,    setProofFile]    = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const [proofLoading, setProofLoading] = useState(false);
-  const [proofError, setProofError]     = useState("");
+  const [proofError,   setProofError]   = useState("");
 
   // --------------------------------------------------
   // Fetch mitra
@@ -64,7 +78,12 @@ const BankSampahPage = () => {
         setMitras(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("[BankSampahPage] Fetch error:", err);
-        setError("Gagal mengambil data mitra");
+        // Jika 401 (guest + endpoint butuh auth), tampilkan empty state bukan error
+        if (err.response?.status === 401) {
+          setMitras([]);
+        } else {
+          setError("Gagal mengambil data mitra");
+        }
       } finally {
         setLoading(false);
       }
@@ -215,34 +234,39 @@ const BankSampahPage = () => {
 
         {/* Step: pilih mitra & catat aksi */}
         {step === "list" && selectedMitra && (
-          <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
-            <h2 className="font-semibold text-slate-700">
-              Setor ke <span className="text-blue-600">{selectedMitra.name}</span>?
-            </h2>
-            <p className="text-sm text-slate-500">
-              Catat aksimu — poin diberikan setelah diverifikasi admin.
-            </p>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Catatan tambahan... (opsional)"
-              rows={2}
-              maxLength={300}
-              className="w-full border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-            {logError && <p className="text-sm text-red-500">{logError}</p>}
-            <button
-              onClick={handleLog}
-              disabled={logLoading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
-            >
-              {logLoading ? "Menyimpan..." : "✓ Catat Setor Sampah"}
-            </button>
-          </div>
+          isLoggedIn ? (
+            <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
+              <h2 className="font-semibold text-slate-700">
+                Setor ke <span className="text-blue-600">{selectedMitra.name}</span>?
+              </h2>
+              <p className="text-sm text-slate-500">
+                Catat aksimu — poin diberikan setelah diverifikasi admin.
+              </p>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Catatan tambahan... (opsional)"
+                rows={2}
+                maxLength={300}
+                className="w-full border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              {logError && <p className="text-sm text-red-500">{logError}</p>}
+              <button
+                onClick={handleLog}
+                disabled={logLoading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+              >
+                {logLoading ? "Menyimpan..." : "✓ Catat Setor Sampah"}
+              </button>
+            </div>
+          ) : (
+            /* Guest: tampilkan blok CTA login */
+            <GuestClaimBlock pointsAvailable={50} />
+          )
         )}
 
         {/* Step: upload bukti foto */}
-        {step === "proof" && (
+        {step === "proof" && isLoggedIn && (
           <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
             <h2 className="font-semibold text-slate-700">Upload Foto Bukti Setoran</h2>
             <p className="text-sm text-slate-500">
@@ -365,7 +389,7 @@ const MitraCard = ({ mitra, selected, onSelect }) => (
 );
 
 // ======================================================
-// PENDING BANNER — menunggu verifikasi admin
+// PENDING BANNER
 // ======================================================
 
 const PendingBanner = ({ mitraName, onHome, onHistory }) => (

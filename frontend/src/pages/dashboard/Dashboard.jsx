@@ -16,15 +16,15 @@ function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const isSuperuser = localStorage.getItem("is_superuser") === "true";
+    // Ganti localStorage → sessionStorage
+    const token = sessionStorage.getItem("access_token");
+    const isSuperuser = sessionStorage.getItem("is_superuser") === "true";
 
     if (!token) {
       navigate("/login");
       return;
     }
 
-    // Superuser tidak boleh di halaman user
     if (isSuperuser) {
       navigate("/admin/dashboard", { replace: true });
       return;
@@ -80,14 +80,12 @@ function Dashboard() {
 
     let max = 0;
     let fav = "-";
-
     for (let key in categoryCount) {
       if (categoryCount[key] > max) {
         max = categoryCount[key];
         fav = key;
       }
     }
-
     setFavoriteCategory(fav);
   };
 
@@ -105,10 +103,7 @@ function Dashboard() {
     <div className="min-h-screen bg-gray-50 px-4 pt-6 pb-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <HeroSection user={user} navigate={navigate} />
-        <SummaryCards
-          user={user}
-          favoriteCategory={favoriteCategory}
-        />
+        <SummaryCards user={user} favoriteCategory={favoriteCategory} />
         <InsightCard user={user} />
         <ActivityChart data={chartData} />
         <RecentHistory history={history} />

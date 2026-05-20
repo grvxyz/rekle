@@ -1,7 +1,19 @@
+/**
+ * pages/action/RecyclePage.jsx
+ *
+ * Perubahan:
+ * - Bisa diakses oleh guest (tidak redirect ke login).
+ * - Guest bisa membaca panduan daur ulang.
+ * - Form klaim poin (log aksi) diganti dengan GuestClaimBlock jika belum login.
+ * - User login tetap bisa klaim poin seperti biasa.
+ */
+
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Recycle, Clock, ArrowLeft, Camera } from "lucide-react";
 import api from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
+import GuestClaimBlock from "@/components/scan/GuestClaimBlock";
 import {
   CATEGORY_LABEL,
   RECYCLE_INFO,
@@ -15,23 +27,25 @@ import {
 const RecyclePage = () => {
   const navigate     = useNavigate();
   const location     = useLocation();
+  const { isLoggedIn } = useAuth();
+
   const result       = location.state?.result ?? null;
   const predictionId = location.state?.prediction_id ?? null;
   const wasteLabel   = result ? (CATEGORY_LABEL[result] ?? result) : "sampah";
   const info         = (result && RECYCLE_INFO[result]) ? RECYCLE_INFO[result] : DEFAULT_INFO;
 
-  const [step, setStep]         = useState("form");
-  const [actionId, setActionId] = useState(null);
+  const [step,      setStep]      = useState("form");
+  const [actionId,  setActionId]  = useState(null);
 
   const [partnerName, setPartnerName] = useState("");
-  const [notes, setNotes]             = useState("");
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
+  const [notes,       setNotes]       = useState("");
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
 
-  const [proofFile, setProofFile]       = useState(null);
+  const [proofFile,    setProofFile]    = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const [proofLoading, setProofLoading] = useState(false);
-  const [proofError, setProofError]     = useState("");
+  const [proofError,   setProofError]   = useState("");
 
   const handleLog = async () => {
     if (!predictionId) {
@@ -42,7 +56,7 @@ const RecyclePage = () => {
       setLoading(true);
       setError("");
       const { data } = await api.post("/actions/", {
-        action_type:   "daur_ulang",  // sinkron dengan backend
+        action_type:   "daur_ulang",
         route:         "mandiri",
         prediction_id: predictionId,
         partner_name:  partnerName.trim() || undefined,
@@ -126,25 +140,28 @@ const RecyclePage = () => {
           </p>
         </div>
 
-        <StepIndicator step={step} />
+        {/* Sembunyikan step indicator untuk guest (hanya ada 1 step yang relevan) */}
+        {isLoggedIn && <StepIndicator step={step} />}
 
+        {/* Panduan — selalu tampil untuk siapapun */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
+          <p className="text-sm text-slate-600 leading-relaxed">{info.desc}</p>
+          <h3 className="font-semibold text-slate-700">Langkah-langkah:</h3>
+          <ol className="space-y-3">
+            {info.steps.map((s, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                <p className="text-sm text-slate-600 leading-relaxed">{s}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* ── FORM KLAIM — hanya untuk user yang sudah login ── */}
         {step === "form" && (
-          <>
-            <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
-              <p className="text-sm text-slate-600 leading-relaxed">{info.desc}</p>
-              <h3 className="font-semibold text-slate-700">Langkah-langkah:</h3>
-              <ol className="space-y-3">
-                {info.steps.map((s, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    <p className="text-sm text-slate-600 leading-relaxed">{s}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
+          isLoggedIn ? (
             <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
               <h2 className="font-semibold text-slate-700">Sudah mendaur ulang?</h2>
               <p className="text-sm text-slate-500">
@@ -182,10 +199,14 @@ const RecyclePage = () => {
                 {loading ? "Menyimpan..." : "Lanjut → Upload Bukti"}
               </button>
             </div>
-          </>
+          ) : (
+            /* Guest: tampilkan blok CTA login */
+            <GuestClaimBlock pointsAvailable={50} />
+          )
         )}
 
-        {step === "proof" && (
+        {/* ── PROOF UPLOAD — hanya untuk user login ── */}
+        {step === "proof" && isLoggedIn && (
           <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
             <h2 className="font-semibold text-slate-700">Upload Foto Bukti</h2>
             <p className="text-sm text-slate-500">
@@ -230,12 +251,13 @@ const RecyclePage = () => {
             </button>
           </div>
         )}
+
       </div>
     </section>
   );
 };
 
-// ── Step Indicator ─────────────────────────────────────────
+// ── Step Indicator ────────────────────────────────────────────
 const StepIndicator = ({ step }) => {
   const steps  = ["form", "proof", "done"];
   const labels = ["Keterangan", "Foto Bukti", "Selesai"];
@@ -261,7 +283,7 @@ const StepIndicator = ({ step }) => {
   );
 };
 
-// ── Pending Banner ─────────────────────────────────────────
+// ── Pending Banner ────────────────────────────────────────────
 const PendingBanner = ({ onHome, onHistory }) => (
   <section className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
     <div className="max-w-sm w-full bg-white rounded-2xl shadow-sm border p-8 text-center space-y-4">

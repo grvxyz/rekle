@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,8 @@ from app.db.session import get_db
 from app.models.user import User
 
 # Endpoint yang akan dipanggil client untuk dapat token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme          = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 def get_current_user(
@@ -16,11 +17,7 @@ def get_current_user(
 ) -> User:
     """
     Dependency utama — validasi JWT dan kembalikan user yang sedang login.
-
-    Pemakaian di endpoint:
-        @router.get("/me")
-        def get_me(current_user: User = Depends(get_current_user)):
-            ...
+    Wajib: jika tidak ada token → 401 Unauthorized.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -32,8 +29,6 @@ def get_current_user(
     if user_id is None:
         raise credentials_exception
 
-    # FIX: tangkap ValueError/TypeError agar token rusak
-    # menghasilkan 401, bukan 500 Internal Server Error.
     try:
         parsed_id = int(user_id)
     except (ValueError, TypeError):
@@ -52,16 +47,42 @@ def get_current_user(
     return user
 
 
+def get_optional_user(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """
+    Dependency opsional — kembalikan user jika ada token valid,
+    kembalikan None jika guest (tidak ada token / token tidak valid).
+
+    Dipakai oleh endpoint /scan/guest sehingga:
+    - User login  → scan tersimpan ke DB + poin diberikan.
+    - Guest       → scan diproses, hasil dikembalikan, tidak tersimpan ke DB.
+    """
+    if not token:
+        return None
+
+    user_id = get_subject_from_token(token, token_type="access")
+    if user_id is None:
+        return None
+
+    try:
+        parsed_id = int(user_id)
+    except (ValueError, TypeError):
+        return None
+
+    user = db.query(User).filter(User.id == parsed_id).first()
+    if user is None or not user.is_active:
+        return None
+
+    return user
+
+
 def get_current_superuser(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """
     Dependency untuk endpoint admin only.
-
-    Pemakaian:
-        @router.delete("/users/{id}")
-        def delete_user(current_user: User = Depends(get_current_superuser)):
-            ...
     """
     if not current_user.is_superuser:
         raise HTTPException(

@@ -1,7 +1,17 @@
+/**
+ * pages/action/ReusePage.jsx
+ *
+ * Perubahan:
+ * - Bisa diakses guest — tips reuse tetap tampil.
+ * - Form klaim poin diganti GuestClaimBlock untuk guest.
+ */
+
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles, Clock, ArrowLeft, Camera } from "lucide-react";
 import api from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
+import GuestClaimBlock from "@/components/scan/GuestClaimBlock";
 import {
   CATEGORY_LABEL,
   REUSE_TIPS,
@@ -9,14 +19,10 @@ import {
   RECOMMENDATION_MAP,
 } from "@/constants/wasteConstants";
 
-// ─── Petakan kategori sampah ke action_type backend ────────
-// Sinkron dengan app/ml/recommendation.py _RECOMMENDATION_MAP
-// action_type yang diterima: kompos | daur_ulang | eco_brick | reuse | khusus
 const getActionType = (result) => {
   const rec = RECOMMENDATION_MAP[result];
-  // ReusePage menangani: reuse, kompos, eco_brick
   if (["reuse", "kompos", "eco_brick"].includes(rec)) return rec;
-  return "reuse"; // fallback
+  return "reuse";
 };
 
 // ======================================================
@@ -24,30 +30,27 @@ const getActionType = (result) => {
 // ======================================================
 
 const ReusePage = () => {
-  const navigate     = useNavigate();
-  const location     = useLocation();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const { isLoggedIn } = useAuth();
+
   const result       = location.state?.result ?? null;
   const predictionId = location.state?.prediction_id ?? null;
   const wasteLabel   = result ? (CATEGORY_LABEL[result] ?? result) : "sampah";
   const tips         = result ? (REUSE_TIPS[result] ?? DEFAULT_TIPS) : DEFAULT_TIPS;
   const actionType   = getActionType(result);
 
-  // step: "form" | "proof" | "done"
-  const [step, setStep]         = useState("form");
-  const [actionId, setActionId] = useState(null);
+  const [step,      setStep]      = useState("form");
+  const [actionId,  setActionId]  = useState(null);
+  const [notes,     setNotes]     = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
 
-  // step form
-  const [notes, setNotes]     = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-
-  // step proof
-  const [proofFile, setProofFile]       = useState(null);
+  const [proofFile,    setProofFile]    = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const [proofLoading, setProofLoading] = useState(false);
-  const [proofError, setProofError]     = useState("");
+  const [proofError,   setProofError]   = useState("");
 
-  // ── Step 1: buat aksi ──────────────────────────────────
   const handleLog = async () => {
     if (!predictionId) {
       setError("Aksi hanya bisa dicatat setelah melakukan scan sampah.");
@@ -57,7 +60,7 @@ const ReusePage = () => {
       setLoading(true);
       setError("");
       const { data } = await api.post("/actions/", {
-        action_type:   actionType,   // kompos | reuse | eco_brick
+        action_type:   actionType,
         route:         "mandiri",
         prediction_id: predictionId,
         notes:         notes.trim() || undefined,
@@ -77,7 +80,6 @@ const ReusePage = () => {
     }
   };
 
-  // ── Step 2: upload bukti foto ──────────────────────────
   const handleProofFile = (file) => {
     if (!file) return;
     setProofFile(file);
@@ -112,7 +114,6 @@ const ReusePage = () => {
     }
   };
 
-  // ── Render: done ───────────────────────────────────────
   if (step === "done") return (
     <PendingBanner
       onHome={() => navigate("/dashboard")}
@@ -130,7 +131,6 @@ const ReusePage = () => {
     actionType === "eco_brick" ? "Cara membuat eco brick dari" :
     "Ide kreatif untuk mengolah";
 
-  // ── Render: utama ──────────────────────────────────────
   return (
     <section className="min-h-screen bg-slate-50 py-12 px-6">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -153,23 +153,24 @@ const ReusePage = () => {
           </p>
         </div>
 
-        <StepIndicator step={step} />
+        {isLoggedIn && <StepIndicator step={step} />}
 
-        {/* ── STEP 1: FORM ── */}
-        {step === "form" && (
-          <>
-            <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-3">
-              <h2 className="font-semibold text-slate-700 mb-1">💡 Ide yang bisa kamu coba</h2>
-              {tips.map((tip, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
-                  <p className="text-sm text-slate-600 leading-relaxed">{tip}</p>
-                </div>
-              ))}
+        {/* Tips — selalu tampil */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-3">
+          <h2 className="font-semibold text-slate-700 mb-1">💡 Ide yang bisa kamu coba</h2>
+          {tips.map((tip, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              <p className="text-sm text-slate-600 leading-relaxed">{tip}</p>
             </div>
+          ))}
+        </div>
 
+        {/* Form klaim — hanya untuk user login */}
+        {step === "form" && (
+          isLoggedIn ? (
             <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
               <h2 className="font-semibold text-slate-700">Sudah dilakukan?</h2>
               <p className="text-sm text-slate-500">
@@ -192,15 +193,16 @@ const ReusePage = () => {
                 {loading ? "Menyimpan..." : "Lanjut → Upload Bukti"}
               </button>
             </div>
-          </>
+          ) : (
+            <GuestClaimBlock pointsAvailable={50} />
+          )
         )}
 
-        {/* ── STEP 2: UPLOAD BUKTI ── */}
-        {step === "proof" && (
+        {step === "proof" && isLoggedIn && (
           <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
             <h2 className="font-semibold text-slate-700">Upload Foto Bukti</h2>
             <p className="text-sm text-slate-500">
-              Foto hasil kerajinan atau proses {pageTitle.toLowerCase()} kamu. Diperlukan untuk verifikasi admin.
+              Foto hasil kerajinan atau proses {pageTitle.toLowerCase()} kamu.
             </p>
 
             {proofPreview ? (
@@ -247,7 +249,6 @@ const ReusePage = () => {
   );
 };
 
-// ── Step Indicator ─────────────────────────────────────────
 const StepIndicator = ({ step }) => {
   const steps  = ["form", "proof", "done"];
   const labels = ["Keterangan", "Foto Bukti", "Selesai"];
@@ -273,7 +274,6 @@ const StepIndicator = ({ step }) => {
   );
 };
 
-// ── Pending Banner ─────────────────────────────────────────
 const PendingBanner = ({ onHome, onHistory }) => (
   <section className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
     <div className="max-w-sm w-full bg-white rounded-2xl shadow-sm border p-8 text-center space-y-4">

@@ -1,3 +1,16 @@
+/**
+ * App.jsx
+ *
+ * Perubahan dari versi lama:
+ * 1. Route guards baca dari AuthContext, bukan langsung localStorage
+ * 2. /scan dan /scan-guest sekarang PUBLIC — bisa diakses tanpa login
+ * 3. ProtectedRoute tidak redirect admin; admin tetap bisa akses user route?
+ *    → TIDAK. Admin diarahkan ke /admin/dashboard jika coba akses user route.
+ * 4. GuestScanRoute: jika sudah login saat buka /scan, tampilkan scan biasa.
+ *    Jika belum login, tetap tampilkan scan tapi pass prop isGuest=true.
+ * 5. Tidak ada loop redirect.
+ */
+
 import {
   BrowserRouter,
   Routes,
@@ -5,6 +18,8 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+
+import { useAuth } from "./context/AuthContext.jsx";
 
 import Navbar from "./components/layout/Navbar.jsx";
 import AdminNavbar from "./components/layout/AdminNavbar.jsx";
@@ -40,39 +55,65 @@ import MitraVerifikasi from "./pages/mitra/MitraVerifikasi.jsx";
 import MitraProfil from "./pages/mitra/MitraProfil.jsx";
 import MitraRiwayat from "./pages/mitra/MitraRiwayat.jsx";
 
-// ─── Route Guards ────────────────────────────────────────────
+// ─── Route Guards ─────────────────────────────────────────────
 
+/**
+ * ProtectedRoute — hanya untuk user biasa (bukan admin).
+ * - Belum login → /login
+ * - Sudah login tapi admin → /admin/dashboard
+ */
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem("access_token");
-  const isSuperuser = localStorage.getItem("is_superuser") === "true";
+  const { isLoggedIn, isSuperuser } = useAuth();
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
   if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
 
   return children;
 }
 
+/**
+ * AdminRoute — hanya untuk admin.
+ * - Belum login → /login
+ * - Sudah login tapi bukan admin → /dashboard
+ */
 function AdminRoute({ children }) {
-  const token = localStorage.getItem("access_token");
-  const isSuperuser = localStorage.getItem("is_superuser") === "true";
+  const { isLoggedIn, isSuperuser } = useAuth();
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
   if (!isSuperuser) return <Navigate to="/dashboard" replace />;
 
   return children;
 }
 
+/**
+ * MitraRoute — hanya untuk mitra (non-admin).
+ * - Belum login → /mitra/login
+ * - Sudah login tapi admin → /admin/dashboard
+ */
 function MitraRoute({ children }) {
-  const token = localStorage.getItem("access_token");
-  const isSuperuser = localStorage.getItem("is_superuser") === "true";
+  const { isLoggedIn, isSuperuser } = useAuth();
 
-  if (!token) return <Navigate to="/mitra/login" replace />;
+  if (!isLoggedIn) return <Navigate to="/mitra/login" replace />;
   if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
 
   return children;
 }
 
-// ─── Layouts ─────────────────────────────────────────────────
+/**
+ * RedirectIfLoggedIn — untuk halaman login/register.
+ * Jika sudah login, langsung ke dashboard yang sesuai.
+ */
+function RedirectIfLoggedIn({ children }) {
+  const { isLoggedIn, isSuperuser } = useAuth();
+
+  if (isLoggedIn) {
+    return <Navigate to={isSuperuser ? "/admin/dashboard" : "/dashboard"} replace />;
+  }
+
+  return children;
+}
+
+// ─── Layouts ──────────────────────────────────────────────────
 
 function AdminLayout({ children }) {
   return (
@@ -115,31 +156,48 @@ function Layout() {
     <div className="flex flex-col min-h-screen text-foreground">
 
       {/* NAVBAR */}
-      {!hideLayout && !isMitraPage && (isAdminPage ? <AdminNavbar /> : <Navbar />)}
+      {!hideLayout && !isMitraPage && (
+        isAdminPage ? <AdminNavbar /> : <Navbar />
+      )}
 
       {/* CONTENT */}
       <main className={`flex-1 ${!isMitraPage && !hideLayout ? "pt-20" : ""}`}>
         <Routes>
 
-          {/* PUBLIC */}
+          {/* ── PUBLIC ─────────────────────────────────── */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
 
-          {/* USER */}
+          {/* Login/register: jika sudah login → redirect dashboard */}
+          <Route
+            path="/login"
+            element={
+              <RedirectIfLoggedIn>
+                <LoginPage />
+              </RedirectIfLoggedIn>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <RedirectIfLoggedIn>
+                <RegisterPage />
+              </RedirectIfLoggedIn>
+            }
+          />
+
+          {/*
+            /scan bisa diakses siapa saja.
+            ScanPage sendiri menerima prop isGuest untuk membatasi
+            tombol "Klaim Poin" jika belum login.
+          */}
+          <Route path="/scan" element={<ScanPage />} />
+
+          {/* ── USER (protected) ────────────────────────── */}
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <UserDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/scan"
-            element={
-              <ProtectedRoute>
-                <ScanPage />
               </ProtectedRoute>
             }
           />
@@ -192,7 +250,7 @@ function Layout() {
             }
           />
 
-          {/* ADMIN */}
+          {/* ── ADMIN (protected) ───────────────────────── */}
           <Route
             path="/admin/dashboard"
             element={
@@ -274,11 +332,10 @@ function Layout() {
             }
           />
 
-          {/* MITRA - PUBLIC */}
+          {/* ── MITRA ───────────────────────────────────── */}
           <Route path="/mitra/login" element={<MitraLogin />} />
           <Route path="/mitra/register" element={<MitraRegister />} />
 
-          {/* MITRA - PROTECTED */}
           <Route
             path="/mitra/dashboard"
             element={
@@ -320,7 +377,7 @@ function Layout() {
             }
           />
 
-          {/* FALLBACK */}
+          {/* ── FALLBACK ─────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" />} />
 
         </Routes>

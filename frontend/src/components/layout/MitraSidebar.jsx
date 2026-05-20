@@ -33,9 +33,9 @@ const MitraSidebar = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("is_superuser");
+    sessionStorage.removeItem("access_token");
+    sessionStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("is_superuser");
     navigate("/mitra/login");
   };
 

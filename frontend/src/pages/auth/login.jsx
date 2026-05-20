@@ -15,9 +15,11 @@ import Input from "../../components/ui/input.jsx";
 import Label from "../../components/ui/label.jsx";
 import { Checkbox } from "../../components/ui/checkbox.jsx";
 import api from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext.jsx";
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail]               = useState("");
@@ -31,38 +33,54 @@ function LoginPage() {
     setError("");
 
     try {
-      // ── 1. Login → dapat token ──────────────────────
+      // Step 1: Login → dapat token
+      console.log("[Login] Mengirim request login...");
       const { data } = await api.post("/auth/login", { email, password });
+      console.log("[Login] Response:", data);
 
       if (!data.access_token) {
         throw new Error("Token tidak ditemukan dari server");
       }
 
-      localStorage.setItem("access_token", data.access_token);
+      // Step 2: Simpan token sementara di sessionStorage
+      // supaya interceptor axios bisa pakai saat request /users/me
+      sessionStorage.setItem("access_token", data.access_token);
       if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token);
+        sessionStorage.setItem("refresh_token", data.refresh_token);
       }
 
-      // ── 2. Fetch profil untuk cek is_superuser ──────
+      // Step 3: Fetch profil untuk cek is_superuser
+      console.log("[Login] Mengambil data profil...");
       const { data: me } = await api.get("/users/me");
+      console.log("[Login] Profil:", me);
 
-      // ── 3. Simpan role ke localStorage ─────────────
-      localStorage.setItem("is_superuser", me.is_superuser ? "true" : "false");
+      // Step 4: Simpan ke AuthContext (update state React)
+      login({
+        accessToken:  data.access_token,
+        refreshToken: data.refresh_token,
+        superuser:    me.is_superuser,
+      });
 
-      // ── 4. Redirect sesuai role ─────────────────────
+      console.log("[Login] is_superuser:", me.is_superuser);
+
+      // Step 5: Redirect sesuai role
       if (me.is_superuser) {
-        navigate("/admin/dashboard");
+        console.log("[Login] Redirect ke /admin/dashboard");
+        navigate("/admin/dashboard", { replace: true });
       } else {
-        navigate("/dashboard");
+        console.log("[Login] Redirect ke /dashboard");
+        navigate("/dashboard", { replace: true });
       }
 
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
+      console.error("[Login] ERROR:", err);
+      console.error("[Login] Response data:", err.response?.data);
+      console.error("[Login] Status:", err.response?.status);
 
-      // Hapus semua data kalau login gagal
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("is_superuser");
+      // Bersihkan sessionStorage jika gagal
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("is_superuser");
 
       setError(
         err.response?.data?.detail ||

@@ -350,11 +350,11 @@ const MitraRegister = () => {
         password: form.password,
       });
 
-      localStorage.setItem("access_token", loginData.access_token);
+      sessionStorage.setItem("access_token", loginData.access_token);
       if (loginData.refresh_token) {
-        localStorage.setItem("refresh_token", loginData.refresh_token);
+        sessionStorage.setItem("refresh_token", loginData.refresh_token);
       }
-      localStorage.setItem("is_superuser", "false");
+      sessionStorage.setItem("is_superuser", "false");
 
       // 3. Buat data mitra menggunakan endpoint /mitra/mine
       //    (diikat ke user yang sedang login via token)
