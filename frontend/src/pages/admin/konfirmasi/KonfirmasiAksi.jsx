@@ -37,27 +37,42 @@ const KonfirmasiAksi = () => {
     fetchActions();
   }, [fetchActions]);
 
-  const updateStatus = async (actionId, newStatus) => {
-    const isApprove = newStatus === "confirmed";
-
-    const confirmed = window.confirm(
-      `Yakin ingin ${isApprove ? "mengonfirmasi" : "menolak"} aksi ini?`
-    );
-
+  const handleApprove = async (actionId) => {
+    const confirmed = window.confirm("Yakin ingin mengonfirmasi aksi ini?");
     if (!confirmed) return;
 
     try {
       setActionLoading(actionId);
-
       await api.patch(`/actions/${actionId}/verify`, {
-        status: newStatus,
+        status: "approved",
       });
-
-      setActions((prev) =>
-        prev.filter((a) => a.id !== actionId)
-      );
+      setActions((prev) => prev.filter((a) => a.id !== actionId));
     } catch (err) {
-      alert("Gagal memproses aksi");
+      const detail = err.response?.data?.detail;
+      alert(detail || "Gagal memproses aksi");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (actionId) => {
+    const reason = window.prompt("Masukkan alasan penolakan:");
+    if (reason === null) return; // user tekan Cancel
+    if (!reason.trim()) {
+      alert("Alasan penolakan tidak boleh kosong.");
+      return;
+    }
+
+    try {
+      setActionLoading(actionId);
+      await api.patch(`/actions/${actionId}/verify`, {
+        status: "rejected",
+        rejection_reason: reason.trim(),
+      });
+      setActions((prev) => prev.filter((a) => a.id !== actionId));
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      alert(detail || "Gagal menolak aksi");
     } finally {
       setActionLoading(null);
     }
@@ -76,7 +91,6 @@ const KonfirmasiAksi = () => {
             Tinjau dan verifikasi aksi pengguna
           </p>
         </div>
-
       </div>
 
       {/* ERROR */}
@@ -99,12 +113,8 @@ const KonfirmasiAksi = () => {
             <ActionCard
               key={action.id}
               action={action}
-              onConfirm={() =>
-                updateStatus(action.id, "confirmed")
-              }
-              onReject={() =>
-                updateStatus(action.id, "rejected")
-              }
+              onConfirm={() => handleApprove(action.id)}
+              onReject={() => handleReject(action.id)}
               isLoading={actionLoading === action.id}
             />
           ))}
