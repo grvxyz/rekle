@@ -13,7 +13,7 @@ function ActivityChart({ data }) {
   const chartData = Array.isArray(data) ? data : [];
 
   return (
-    <Card>
+    <Card className="h-full border-0 shadow-sm">
       <CardContent className="p-5">
 
         <SectionHeader

@@ -38,6 +38,7 @@ import ActionPage from "./pages/action/ActionPage";
 import ReusePage from "./pages/action/ReusePage";
 import RecyclePage from "./pages/action/RecyclePage";
 import BankSampahPage from "./pages/action/BankSampahPage";
+import ChallengePage from "./pages/challenge/ChallengePage.jsx";
 
 import AdminDashboard from "./pages/admin/dashboard/Dashboard.jsx";
 import KonfirmasiAksi from "./pages/admin/konfirmasi/KonfirmasiAksi.jsx";
@@ -246,6 +247,14 @@ function Layout() {
             element={
               <ProtectedRoute>
                 <BankSampahPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/challenge"
+            element={
+              <ProtectedRoute>
+                <ChallengePage />
               </ProtectedRoute>
             }
           />

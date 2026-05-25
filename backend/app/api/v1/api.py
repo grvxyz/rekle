@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     admin,
     mitra,
     action, 
+    content,
 )
 
 api_router = APIRouter()
@@ -24,3 +25,6 @@ api_router.include_router(mitra.router, prefix="/mitra", tags=["Mitra"])
 
 # Actions 
 api_router.include_router(action.router)
+
+# Content
+api_router.include_router(content.router, prefix="/content", tags=["Content"])
