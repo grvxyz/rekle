@@ -95,20 +95,28 @@ const Dashboard = () => {
         recentActionsResponse,
         usersResponse,
       ] = await Promise.all([
+        // GET /api/v1/admin/dashboard
         api.get("/admin/dashboard", {
           params: { start_date, end_date },
         }),
+        // GET /api/v1/admin/analytics/timeseries
         api.get("/admin/analytics/timeseries", {
           params: { start_date, end_date },
         }),
+        // GET /api/v1/admin/analytics/insights
         api.get("/admin/analytics/insights"),
+        // GET /api/v1/admin/analytics/actions
         api.get("/admin/analytics/actions", {
           params: { start_date, end_date },
         }),
+        // GET /api/v1/actions/pending  ← endpoint Actions (bukan admin)
         api.get("/actions/pending"),
+        // GET /api/v1/admin/users
         api.get("/admin/users", { params: { limit: 50 } }),
       ]);
 
+      // --- Dashboard stats ---
+      // Response: { total_users, total_scans, total_actions, total_points_distributed, top_categories[] }
       setDashboard({
         total_users: dashboardResponse.data?.total_users || 0,
         total_scans: dashboardResponse.data?.total_scans || 0,
@@ -120,6 +128,8 @@ const Dashboard = () => {
           : [],
       });
 
+      // --- Timeseries ---
+      // Response: array of { date, total | count }
       const formattedTimeseries = Array.isArray(timeseriesResponse.data)
         ? timeseriesResponse.data.map((item) => ({
             date: item.date,
@@ -128,6 +138,8 @@ const Dashboard = () => {
         : [];
       setTimeseries(formattedTimeseries);
 
+      // --- Insights ---
+      // Response: { insights: [], stats: {} }
       setInsights(
         Array.isArray(insightsResponse.data?.insights)
           ? insightsResponse.data.insights
@@ -135,14 +147,21 @@ const Dashboard = () => {
       );
       setInsightStats(insightsResponse.data?.stats ?? {});
 
+      // --- Action Analytics ---
+      // Response: { by_action_type: [], total_points_from_actions: number }
       setActionAnalytics({
-        by_action_type: Array.isArray(actionAnalyticsResponse.data?.by_action_type)
+        by_action_type: Array.isArray(
+          actionAnalyticsResponse.data?.by_action_type
+        )
           ? actionAnalyticsResponse.data.by_action_type
           : [],
         total_points_from_actions:
           actionAnalyticsResponse.data?.total_points_from_actions || 0,
       });
 
+      // --- Recent Actions (pending) ---
+      // Response dari GET /api/v1/actions/pending:
+      // bisa berupa array langsung, atau { items: [] }
       const actionsData = recentActionsResponse.data;
       const actionsArray = Array.isArray(actionsData)
         ? actionsData
@@ -151,11 +170,22 @@ const Dashboard = () => {
         : [];
       setRecentActions(actionsArray.slice(0, 8));
 
-      setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
+      // --- Users ---
+      // Response dari GET /api/v1/admin/users:
+      // bisa berupa array langsung, atau { items: [], total: number }
+      const usersData = usersResponse.data;
+      const usersArray = Array.isArray(usersData)
+        ? usersData
+        : Array.isArray(usersData?.items)
+        ? usersData.items
+        : [];
+      setUsers(usersArray);
     } catch (err) {
       console.error("Dashboard Error:", err);
       if (err.response?.status === 403) {
         setError("Akses admin ditolak");
+      } else if (err.response?.status === 401) {
+        setError("Sesi habis, silakan login kembali");
       } else {
         setError("Gagal mengambil data dashboard");
       }
@@ -171,6 +201,7 @@ const Dashboard = () => {
     fetchAll();
   }, [fetchAll]);
 
+  // Auto-refresh setiap 30 detik
   useEffect(() => {
     const interval = setInterval(() => {
       fetchAll();
@@ -222,10 +253,30 @@ const Dashboard = () => {
 
       {/* STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Pengguna" value={dashboard.total_users} icon={Users} color="green" />
-        <StatsCard title="Total Scan" value={dashboard.total_scans} icon={ScanLine} color="blue" />
-        <StatsCard title="Total Aksi" value={dashboard.total_actions} icon={Zap} color="amber" />
-        <StatsCard title="Total Poin" value={dashboard.total_points_distributed} icon={Coins} color="violet" />
+        <StatsCard
+          title="Total Pengguna"
+          value={dashboard.total_users}
+          icon={Users}
+          color="green"
+        />
+        <StatsCard
+          title="Total Scan"
+          value={dashboard.total_scans}
+          icon={ScanLine}
+          color="blue"
+        />
+        <StatsCard
+          title="Total Aksi"
+          value={dashboard.total_actions}
+          icon={Zap}
+          color="amber"
+        />
+        <StatsCard
+          title="Total Poin"
+          value={dashboard.total_points_distributed}
+          icon={Coins}
+          color="violet"
+        />
       </div>
 
       {/* INSIGHT */}

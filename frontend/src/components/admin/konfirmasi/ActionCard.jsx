@@ -4,6 +4,14 @@ import {
   STATUS_CONFIG,
 } from "./constants";
 
+const BASE_URL = "http://localhost:8000";
+
+function buildImageUrl(path) {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${BASE_URL}/${path.replace(/^\/+/, "")}`;
+}
+
 const ActionCard = ({
   action,
   onConfirm,
@@ -13,6 +21,8 @@ const ActionCard = ({
   const statusCfg =
     STATUS_CONFIG[action.status] ||
     STATUS_CONFIG.pending;
+
+  const proofUrl = buildImageUrl(action.proof_image_path);
 
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4">
@@ -76,10 +86,10 @@ const ActionCard = ({
       )}
 
       {/* IMAGE */}
-      {action.proof_image_path && (
+      {proofUrl && (
         <img
-          src={action.proof_image_path}
-          alt="proof"
+          src={proofUrl}
+          alt="Bukti aksi"
           className="rounded-xl max-h-72 border"
         />
       )}

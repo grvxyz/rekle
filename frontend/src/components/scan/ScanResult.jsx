@@ -1,15 +1,4 @@
-/**
- * ScanResult.jsx
- *
- * Perubahan dari versi lama:
- * - Terima prop isGuest dari ScanPage
- * - Jika isGuest=true:
- *   • Tampilkan badge "Login untuk klaim poin"
- *   • Tombol "Lanjutkan ke Aksi" → redirect ke /login (bukan /action)
- *   • Tampilkan info poin yang bisa didapat tapi tidak aktif
- * - Jika isGuest=false (sudah login): perilaku sama seperti sebelumnya
- */
-
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "@/components/ui/button";
 import {
@@ -20,13 +9,14 @@ import {
   Brain,
   CheckCircle2,
   AlertTriangle,
-  Lock,
-  Star,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
-// Menerima props dari ScanPage
-const ScanResult = ({ image, result, resetScan, isGuest = false }) => {
+// Menerima props dari ScanPage — BUKAN dari location.state
+const ScanResult = ({ image, result, resetScan }) => {
   const navigate = useNavigate();
+  const [showAllIdeas, setShowAllIdeas] = useState(false);
 
   if (!result) {
     return (
@@ -51,27 +41,17 @@ const ScanResult = ({ image, result, resetScan, isGuest = false }) => {
   };
 
   const handleLanjutAksi = () => {
-    if (isGuest) {
-      // Guest klik klaim → redirect ke login
-      navigate("/login", {
-        state: {
-          from: "/scan",
-          message: "Login untuk mengklaim poin dan melanjutkan aksi.",
-        },
-      });
-      return;
-    }
-
     navigate("/action", {
       state: {
-        result:        result?.result || result?.result || null,
-        prediction_id: result?.id ?? null,
+        result:        result?.category || result?.result || null,
+        prediction_id: result?.prediction_id ?? null,
       },
     });
   };
 
-  // Estimasi poin yang bisa didapat (untuk ditampilkan ke guest)
-  const estimatedPoints = 10; // sesuai settings.points_per_scan di backend
+  // Ide upcycling dari API
+  const ideas = result?.upcycle_ideas || [];
+  const visibleIdeas = showAllIdeas ? ideas : ideas.slice(0, 4);
 
   return (
     <div className="space-y-8 mt-4">
@@ -85,24 +65,6 @@ const ScanResult = ({ image, result, resetScan, isGuest = false }) => {
         <p className="text-slate-500 mt-3">AI berhasil menganalisis gambar sampah Anda</p>
       </div>
 
-      {/* BANNER POIN UNTUK GUEST */}
-      {isGuest && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
-          <Star className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-amber-800 text-sm">
-              Kamu bisa mendapat +{estimatedPoints} poin dari scan ini!
-            </p>
-            <p className="text-amber-700 text-sm mt-1">
-              <a href="/login" className="underline font-semibold">
-                Login atau daftar
-              </a>{" "}
-              untuk menyimpan hasil scan, mengklaim poin, dan melanjutkan aksi nyata.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* MAIN CONTENT */}
       <div className="grid md:grid-cols-2 gap-6">
 
@@ -110,7 +72,7 @@ const ScanResult = ({ image, result, resetScan, isGuest = false }) => {
         {(image || result?.image_path) && (
           <div className="bg-white border rounded-3xl overflow-hidden shadow-sm">
             <img
-              src={image || `http://localhost:8000/${result.image_path}`}
+              src={image || `http://127.0.0.1:8000/${result.image_path}`}
               alt="Result"
               className="w-full h-105 object-cover"
             />
@@ -144,16 +106,6 @@ const ScanResult = ({ image, result, resetScan, isGuest = false }) => {
               />
             </div>
           </div>
-
-          {/* Poin yang bisa diklaim — hanya tampil di guest */}
-          {isGuest && (
-            <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-amber-500" />
-              <span className="text-amber-700 text-sm font-medium">
-                +{estimatedPoints} poin tersedia — login untuk klaim
-              </span>
-            </div>
-          )}
 
           <div className="pt-5 border-t">
             <div className="grid grid-cols-2 gap-5">
@@ -260,36 +212,61 @@ const ScanResult = ({ image, result, resetScan, isGuest = false }) => {
         </div>
       </div>
 
+      {/* UPCYCLE IDEAS */}
+      {ideas.length > 0 && (
+        <div className="bg-white border rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-2xl font-bold">Ide Daur Ulang Kreatif</h3>
+            <span className="text-sm text-slate-400">{ideas.length} ide</span>
+          </div>
+          <p className="text-sm text-slate-500 mb-6">
+            Sampah <span className="font-medium text-emerald-600">{result.result}</span> bisa
+            diubah menjadi berbagai karya kreatif berikut.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {visibleIdeas.map((idea) => (
+              <div
+                key={idea.id}
+                className="flex gap-4 p-4 border rounded-2xl hover:border-emerald-300 hover:bg-emerald-50 transition"
+              >
+                <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+                  {idea.id}
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-800">{idea.title}</p>
+                  <p className="text-sm text-slate-500 mt-1">{idea.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {ideas.length > 4 && (
+            <button
+              onClick={() => setShowAllIdeas(!showAllIdeas)}
+              className="mt-5 w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition text-sm font-medium"
+            >
+              {showAllIdeas ? (
+                <><ChevronUp className="w-4 h-4" /> Tampilkan lebih sedikit</>
+              ) : (
+                <><ChevronDown className="w-4 h-4" /> Lihat semua {ideas.length} ide</>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* BUTTONS */}
       <div className="flex flex-col md:flex-row gap-4">
-        {isGuest ? (
-          /* Guest: tombol mengarah ke login dengan pesan konteks */
-          <>
-            <Button
-              className="flex-1 bg-amber-500 hover:bg-amber-600 flex items-center justify-center gap-2"
-              onClick={handleLanjutAksi}
-            >
-              <Lock className="w-4 h-4" />
-              Login untuk Klaim Poin & Lanjut Aksi
-            </Button>
-            <Button variant="outline" onClick={resetScan}>
-              Scan Lagi
-            </Button>
-          </>
-        ) : (
-          /* User login: tombol normal */
-          <>
-            <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleLanjutAksi}
-            >
-              Lanjutkan ke Aksi
-            </Button>
-            <Button variant="outline" onClick={resetScan}>
-              Scan Lagi
-            </Button>
-          </>
-        )}
+        <Button
+          className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+          onClick={handleLanjutAksi}
+        >
+          Lanjutkan ke Aksi
+        </Button>
+        <Button variant="outline" onClick={resetScan}>
+          Scan Lagi
+        </Button>
       </div>
 
     </div>
