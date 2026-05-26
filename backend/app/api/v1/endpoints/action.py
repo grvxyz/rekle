@@ -68,7 +68,12 @@ def create_action(
     db.add(action)
     db.commit()
     db.refresh(action)
-    return action
+    return {
+        "message":
+            "Action berhasil dikirim",
+        "action_id":
+            action.id,
+    }
 
 
 # ─── 2. User lihat riwayat aksi ────────────────────────────

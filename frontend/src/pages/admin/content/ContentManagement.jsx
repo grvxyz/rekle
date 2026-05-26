@@ -444,7 +444,7 @@ const ContentManagement = () => {
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
-          + Create Content
+          Create Content
         </button>
       </div>
 
