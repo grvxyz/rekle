@@ -27,15 +27,16 @@ import UserDashboard  from "./pages/dashboard/Dashboard.jsx";
 import Profile        from "./pages/profile/Profile.jsx";
 import HistoryPage    from "./pages/history/HistoryPage.jsx";
 import ChallengePage  from "./pages/challenge/ChallengePage.jsx";
+import ChallengeDetail from "./pages/challenge/ChallengeDetail.jsx";
 
 // ── Action pages ────────────────────────────────────────────
-import ActionPage    from "./pages/action/ActionPage";
-import ReusePage     from "./pages/action/ReusePage";
-import RecyclePage   from "./pages/action/RecyclePage";
+import ActionPage     from "./pages/action/ActionPage";
+import ReusePage      from "./pages/action/ReusePage";
+import RecyclePage    from "./pages/action/RecyclePage";
 import BankSampahPage from "./pages/action/BankSampahPage";
-import KomposPage    from "./pages/action/KomposPage";
-import EcoBrickPage  from "./pages/action/EcoBrickPage";
-import KhususPage    from "./pages/action/KhususPage";
+import KomposPage     from "./pages/action/KomposPage";
+import EcoBrickPage   from "./pages/action/EcoBrickPage";
+import KhususPage     from "./pages/action/KhususPage";
 
 // ── Admin pages ─────────────────────────────────────────────
 import AdminDashboard    from "./pages/admin/dashboard/Dashboard.jsx";
@@ -48,12 +49,12 @@ import ActionTracking    from "./pages/admin/action-tracking/ActionTracking.jsx"
 import ContentManagement from "./pages/admin/content/ContentManagement.jsx";
 
 // ── Mitra pages ─────────────────────────────────────────────
-import MitraLogin     from "./pages/mitra/MitraLogin.jsx";
-import MitraRegister  from "./pages/mitra/MitraRegister.jsx";
-import MitraDashboard from "./pages/mitra/MitraDashboard.jsx";
+import MitraLogin      from "./pages/mitra/MitraLogin.jsx";
+import MitraRegister   from "./pages/mitra/MitraRegister.jsx";
+import MitraDashboard  from "./pages/mitra/MitraDashboard.jsx";
 import MitraVerifikasi from "./pages/mitra/MitraVerifikasi.jsx";
-import MitraProfil    from "./pages/mitra/MitraProfil.jsx";
-import MitraRiwayat   from "./pages/mitra/MitraRiwayat.jsx";
+import MitraProfil     from "./pages/mitra/MitraProfil.jsx";
+import MitraRiwayat    from "./pages/mitra/MitraRiwayat.jsx";
 
 // ─── Route Guards ─────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ function Layout() {
           <Route path="/profile"   element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/history"   element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
           <Route path="/challenge" element={<ProtectedRoute><ChallengePage /></ProtectedRoute>} />
+          <Route path="/challenge/:id" element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
 
           {/* Action hub */}
           <Route path="/action" element={<ProtectedRoute><ActionPage /></ProtectedRoute>} />
@@ -167,18 +169,18 @@ function Layout() {
           <Route path="/action/khusus"      element={<ProtectedRoute><KhususPage /></ProtectedRoute>} />
 
           {/* ── ADMIN (protected) ───────────────────── */}
-          <Route path="/admin/dashboard" element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/konfirmasi" element={<AdminRoute><AdminLayout><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/user" element={<AdminRoute><AdminLayout><UserManagement /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/partners" element={<AdminRoute><AdminLayout><DataMitra /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/waste-data" element={<AdminRoute><AdminLayout><DataSampah /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/ai-monitoring" element={<AdminRoute><AdminLayout><AIMonitoring /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/dashboard"      element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/konfirmasi"     element={<AdminRoute><AdminLayout><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/user"           element={<AdminRoute><AdminLayout><UserManagement /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/partners"       element={<AdminRoute><AdminLayout><DataMitra /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/waste-data"     element={<AdminRoute><AdminLayout><DataSampah /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/ai-monitoring"  element={<AdminRoute><AdminLayout><AIMonitoring /></AdminLayout></AdminRoute>} />
           <Route path="/admin/action-tracking" element={<AdminRoute><AdminLayout><ActionTracking /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/content" element={<AdminRoute><AdminLayout><ContentManagement /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/content"        element={<AdminRoute><AdminLayout><ContentManagement /></AdminLayout></AdminRoute>} />
 
           {/* ── MITRA ───────────────────────────────── */}
-          <Route path="/mitra/login"    element={<MitraLogin />} />
-          <Route path="/mitra/register" element={<MitraRegister />} />
+          <Route path="/mitra/login"      element={<MitraLogin />} />
+          <Route path="/mitra/register"   element={<MitraRegister />} />
           <Route path="/mitra/dashboard"  element={<MitraRoute><MitraLayout><MitraDashboard /></MitraLayout></MitraRoute>} />
           <Route path="/mitra/verifikasi" element={<MitraRoute><MitraLayout><MitraVerifikasi /></MitraLayout></MitraRoute>} />
           <Route path="/mitra/profil"     element={<MitraRoute><MitraLayout><MitraProfil /></MitraLayout></MitraRoute>} />

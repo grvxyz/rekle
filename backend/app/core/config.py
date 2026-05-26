@@ -62,14 +62,7 @@ class Settings(BaseSettings):
     ml_confidence_gap_threshold: float = 0.2
 
     ml_class_labels: str = (
-        "organik,"
-        "plastik_pet,"
-        "plastik_hdpe,"
-        "plastik_campuran,"
-        "kertas_bersih,"
-        "kertas_kotor,"
-        "kaca_utuh,"
-        "kaca_pecah"
+    "B3,Kaca,Kardus,Kertas,Logam,Medis,Plastik,nonsampah,organik"
     )
 
     @property

@@ -147,7 +147,7 @@ const ScanPage = () => {
           </>
         )}
 
-        {step === "analyzing" && <ScanAnalyzing image={image} />}
+        {step === "analyzing" && <ScanAnalyzing imagePreview={image} />}
 
         {step === "result" && (
           <ScanResult

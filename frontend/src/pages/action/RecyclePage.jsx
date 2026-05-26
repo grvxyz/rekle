@@ -30,7 +30,7 @@ const RecyclePage = () => {
   const handleSubmitAction = async () => {
     const { data } = await api.post("/actions/", {
       action_type:   "daur_ulang",
-      route:         "mandiri",
+      route:         "mitra",
       prediction_id: predictionId,
       partner_name:  partnerName.trim() || undefined,
       notes:         notes.trim() || undefined,

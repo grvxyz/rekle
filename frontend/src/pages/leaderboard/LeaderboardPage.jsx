@@ -1,173 +1,242 @@
-import { useEffect, useState } from "react";
-import { Trophy, Medal } from "lucide-react";
-import api from "@/lib/axios";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "../ui/card.jsx";
+import SectionHeader from "../ui/SectionHeader.jsx";
+import { Trophy, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
-// ======================================================
-// LEADERBOARD PAGE
-// ======================================================
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-const LeaderboardPage = () => {
-  const [users, setUsers]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
-  const [myId, setMyId]       = useState(null); // highlight user sendiri
+/**
+ * Ambil token dari storage (sesuaikan dengan mekanisme auth aplikasimu).
+ */
+function getAccessToken() {
+  return localStorage.getItem("access_token") ?? "";
+}
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setError("");
+/**
+ * Fetch top users dari REKLE backend.
+ *
+ * Endpoint yang dicoba secara berurutan:
+ *  1. GET /api/v1/admin/analytics/insights  → field `top_users`
+ *  2. GET /api/v1/admin/dashboard           → field `top_users`
+ *
+ * Setiap item diharapkan memiliki setidaknya { id, name/full_name/email, points/total_points/score }.
+ */
+async function fetchLeaderboard(limit = 10) {
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${getAccessToken()}`,
+  };
 
-        // Fetch leaderboard + profil sendiri secara paralel
-        const [lbRes, meRes] = await Promise.all([
-          api.get("/users/leaderboard"),
-          api.get("/users/me"),
-        ]);
+  const endpoints = [
+    `${BASE_URL}/api/v1/admin/analytics/insights`,
+    `${BASE_URL}/api/v1/admin/dashboard`,
+  ];
 
-        setUsers(Array.isArray(lbRes.data) ? lbRes.data : []);
-        setMyId(meRes.data?.id ?? null);
-      } catch (err) {
-        console.error("[LeaderboardPage] Fetch error:", err);
-        setError("Gagal mengambil data leaderboard");
-      } finally {
-        setLoading(false);
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) continue;
+
+      const json = await res.json();
+
+      // Normalise: cari array top_users / leaderboard / users di respons
+      const raw =
+        json?.top_users ??
+        json?.leaderboard ??
+        json?.data?.top_users ??
+        json?.data?.leaderboard ??
+        null;
+
+      if (Array.isArray(raw) && raw.length > 0) {
+        return raw.slice(0, limit).map((u, i) => ({
+          id: u.id ?? u.user_id ?? i,
+          name:
+            u.name ??
+            u.full_name ??
+            u.username ??
+            u.email ??
+            `Pengguna ${i + 1}`,
+          points:
+            u.points ??
+            u.total_points ??
+            u.score ??
+            u.reward_points ??
+            0,
+        }));
       }
-    };
+    } catch {
+      // lanjut ke endpoint berikutnya
+    }
+  }
 
-    fetchData();
-  }, []);
-
-  // ======================================================
-  // RENDER
-  // ======================================================
-
-  return (
-    <section className="min-h-screen bg-slate-50 py-12 px-6">
-      <div className="max-w-xl mx-auto space-y-6">
-
-        {/* HEADER */}
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center">
-            <Trophy className="w-8 h-8 text-yellow-500" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-800">Leaderboard</h1>
-          <p className="text-slate-500 text-sm">
-            Ranking pengguna berdasarkan total poin
-          </p>
-        </div>
-
-        {/* ERROR */}
-        {error && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-2xl text-sm text-center">
-            {error}
-          </div>
-        )}
-
-        {/* LIST */}
-        {loading ? (
-          <SkeletonLeaderboard />
-        ) : users.length === 0 ? (
-          <div className="bg-white rounded-2xl border p-10 text-center text-slate-400 text-sm">
-            Belum ada data leaderboard
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {users.map((user, index) => (
-              <LeaderboardRow
-                key={user.id}
-                user={user}
-                rank={index + 1}
-                isMe={user.id === myId}
-              />
-            ))}
-          </div>
-        )}
-
-      </div>
-    </section>
+  throw new Error(
+    "Tidak dapat memuat data leaderboard. Pastikan kamu memiliki akses admin."
   );
+}
+
+// ─── Medal colours ────────────────────────────────────────────────────────────
+const MEDAL = {
+  0: { bg: "bg-amber-50",    text: "text-amber-600",   ring: "ring-amber-300"  },
+  1: { bg: "bg-slate-100",   text: "text-slate-500",   ring: "ring-slate-300"  },
+  2: { bg: "bg-orange-50",   text: "text-orange-500",  ring: "ring-orange-300" },
 };
 
-// ======================================================
-// LEADERBOARD ROW
-// ======================================================
-
-const RANK_CONFIG = {
-  1: { icon: "🥇", bg: "bg-yellow-50 border-yellow-300",  text: "text-yellow-700" },
-  2: { icon: "🥈", bg: "bg-slate-100 border-slate-300",   text: "text-slate-600" },
-  3: { icon: "🥉", bg: "bg-orange-50 border-orange-300",  text: "text-orange-700" },
-};
-
-const LeaderboardRow = ({ user, rank, isMe }) => {
-  const cfg = RANK_CONFIG[rank];
-
+function rankStyle(index) {
   return (
-    <div
-      className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all ${
-        isMe
-          ? "bg-green-50 border-green-400 ring-1 ring-green-300"
-          : cfg
-          ? `${cfg.bg}`
-          : "bg-white border-slate-200"
-      }`}
-    >
-      {/* RANK */}
-      <div className="w-8 text-center shrink-0">
-        {cfg ? (
-          <span className="text-xl">{cfg.icon}</span>
-        ) : (
-          <span className="text-sm font-bold text-slate-400">#{rank}</span>
-        )}
-      </div>
+    MEDAL[index] ?? {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      ring: "ring-emerald-200",
+    }
+  );
+}
 
-      {/* AVATAR */}
-      <div className="w-10 h-10 rounded-full bg-green-800 text-white text-sm font-bold flex items-center justify-center shrink-0">
-        {user.full_name
-          ? user.full_name.trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2)
-          : "?"}
-      </div>
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-      {/* INFO */}
-      <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-sm truncate ${isMe ? "text-green-800" : "text-slate-800"}`}>
-          {user.full_name || "Pengguna"}
-          {isMe && (
-            <span className="ml-2 text-xs font-normal text-green-600">(kamu)</span>
-          )}
-        </p>
-        <p className="text-xs text-slate-400">
-          {user.scan_count ?? 0} scan · {user.action_count ?? 0} aksi
-        </p>
+function SkeletonRow() {
+  return (
+    <div className="flex items-center justify-between animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-gray-200" />
+        <div className="h-3 w-32 rounded bg-gray-200" />
       </div>
-
-      {/* POIN */}
-      <div className="text-right shrink-0">
-        <p className={`font-bold text-base ${cfg ? cfg.text : isMe ? "text-green-700" : "text-slate-700"}`}>
-          {(user.total_points ?? 0).toLocaleString("id-ID")}
-        </p>
-        <p className="text-xs text-slate-400">poin</p>
-      </div>
+      <div className="h-3 w-12 rounded bg-gray-200" />
     </div>
   );
-};
+}
 
-// ======================================================
-// SKELETON
-// ======================================================
+function ErrorState({ message, onRetry }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-6 text-center">
+      <AlertCircle className="w-5 h-5 text-red-400" />
+      <p className="text-xs text-gray-500 max-w-[200px]">{message}</p>
+      <button
+        onClick={onRetry}
+        className="mt-1 flex items-center gap-1 text-xs text-emerald-600 hover:underline"
+      >
+        <RefreshCw className="w-3 h-3" />
+        Coba lagi
+      </button>
+    </div>
+  );
+}
 
-const SkeletonLeaderboard = () => (
-  <div className="space-y-2 animate-pulse">
-    {[...Array(10)].map((_, i) => (
-      <div key={i} className="flex items-center gap-4 px-5 py-4 bg-white rounded-2xl border">
-        <div className="w-8 h-5 bg-gray-200 rounded" />
-        <div className="w-10 h-10 bg-gray-200 rounded-full" />
-        <div className="flex-1 space-y-1.5">
-          <div className="h-4 bg-gray-200 rounded w-36" />
-          <div className="h-3 bg-gray-200 rounded w-24" />
+function EmptyState() {
+  return (
+    <div className="py-6 text-center">
+      <p className="text-xs text-gray-400">Belum ada data leaderboard.</p>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+/**
+ * LeaderboardCard
+ *
+ * Props:
+ *  - users   {Array}   – opsional; jika diisi, data statis ini digunakan
+ *                        (berguna saat komponen dipanggil dari parent yang
+ *                        sudah punya data, e.g. dari Admin Dashboard).
+ *  - limit   {number}  – jumlah maks baris (default 10)
+ *  - title   {string}  – judul card
+ *  - subtitle{string}  – subjudul card
+ *
+ * Jika `users` tidak diberikan / kosong, komponen akan fetch sendiri
+ * dari REKLE backend.
+ */
+function LeaderboardCard({
+  users: usersProp = [],
+  limit = 10,
+  title = "Leaderboard",
+  subtitle = "Top pengguna minggu ini",
+}) {
+  const [users, setUsers]     = useState(usersProp);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState(null);
+
+  const shouldFetch = !usersProp || usersProp.length === 0;
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchLeaderboard(limit);
+      setUsers(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (shouldFetch) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Jika props berubah dari luar (e.g. parent refresh), sinkronkan
+  useEffect(() => {
+    if (!shouldFetch) setUsers(usersProp);
+  }, [usersProp, shouldFetch]);
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <SectionHeader title={title} subtitle={subtitle} />
+
+        <div className="mt-4 space-y-3">
+          {/* Loading skeleton */}
+          {loading &&
+            Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
+
+          {/* Error state */}
+          {!loading && error && (
+            <ErrorState message={error} onRetry={load} />
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && users.length === 0 && <EmptyState />}
+
+          {/* Data rows */}
+          {!loading &&
+            !error &&
+            users.map((user, index) => {
+              const style = rankStyle(index);
+              return (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Rank badge */}
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ring-1 ${style.bg} ${style.text} ${style.ring}`}
+                    >
+                      {index + 1}
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">
+                        {user.name}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Points */}
+                  <div className="flex items-center gap-1 text-amber-500">
+                    <Trophy className="w-4 h-4" />
+                    <span className="text-sm font-semibold">
+                      {user.points.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
         </div>
-        <div className="w-14 h-5 bg-gray-200 rounded" />
-      </div>
-    ))}
-  </div>
-);
+      </CardContent>
+    </Card>
+  );
+}
 
-export default LeaderboardPage;
+export default LeaderboardCard;

@@ -1,99 +1,114 @@
-import { Card, CardContent } from "../ui/card.jsx";
-import Button from "../ui/button.jsx";
-import {
-  ScanLine,
-  Recycle,
-  Leaf,
-  CheckCircle2,
-} from "lucide-react";
+/**
+ * ChallengeCard.jsx
+ *
+ * Menampilkan satu challenge sebagai card ringkas.
+ * Klik "Lihat Detail" → navigate ke /challenge/:id
+ */
 
-const iconMap = {
-  scan: ScanLine,
-  recycle: Recycle,
-  reuse: Leaf,
+import { useNavigate } from "react-router-dom";
+
+const TYPE_META = {
+  scan:   { label: "Scan Sampah", icon: "📷", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  action: { label: "Aksi Nyata",  icon: "♻️", color: "bg-green-50 text-green-700 border-green-200" },
+  points: { label: "Kumpul Poin", icon: "⭐", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
 };
 
-function ChallengeCard({ challenge }) {
-  const Icon = iconMap[challenge.type] || ScanLine;
+const STATUS_META = {
+  active:    { label: "Aktif",     color: "bg-emerald-100 text-emerald-700" },
+  inactive:  { label: "Nonaktif",  color: "bg-gray-100 text-gray-500" },
+  completed: { label: "Selesai",   color: "bg-blue-100 text-blue-700" },
+};
 
-  const progress =
-    Math.min(
-      (challenge.current / challenge.target) * 100,
-      100
-    ) || 0;
+export default function ChallengeCard({ challenge }) {
+  const navigate = useNavigate();
+
+  const typeMeta   = TYPE_META[challenge.challenge_type]   ?? { label: challenge.challenge_type ?? "Challenge", icon: "🏆", color: "bg-purple-50 text-purple-700 border-purple-200" };
+  const statusMeta = STATUS_META[challenge.status] ?? { label: challenge.status, color: "bg-gray-100 text-gray-500" };
+
+  const progress   = challenge.current ?? 0;
+  const target     = challenge.target  ?? 1;
+  const pct        = Math.min(100, Math.round((progress / target) * 100));
+  const isDone     = challenge.completed || pct >= 100;
 
   return (
-    <Card>
-      <CardContent className="p-5 space-y-4">
+    <div
+      className={`
+        relative bg-white rounded-2xl border shadow-sm overflow-hidden
+        transition-all duration-200 hover:shadow-md hover:-translate-y-0.5
+        ${isDone ? "border-emerald-300" : "border-gray-200"}
+      `}
+    >
+      {/* Done ribbon */}
+      {isDone && (
+        <div className="absolute top-3 right-3 bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+          ✓ Selesai
+        </div>
+      )}
 
-        <div className="flex items-start justify-between gap-4">
-
-          <div className="flex items-start gap-3">
-
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <Icon className="w-5 h-5 text-emerald-700" />
+      <div className="p-5">
+        {/* Header */}
+        <div className="flex items-start gap-3 mb-3">
+          <span className="text-2xl leading-none mt-0.5">{typeMeta.icon}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${typeMeta.color}`}>
+                {typeMeta.label}
+              </span>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusMeta.color}`}>
+                {statusMeta.label}
+              </span>
             </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-800">
-                {challenge.title}
-              </h3>
-
-              <p className="text-sm text-gray-500 mt-1">
-                {challenge.description}
-              </p>
-            </div>
-
+            <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
+              {challenge.title}
+            </h3>
           </div>
-
-          <span className="text-sm font-semibold text-emerald-700">
-            +{challenge.reward}
-          </span>
-
         </div>
 
-        {/* Progress */}
-        <div className="space-y-2">
+        {/* Description */}
+        {challenge.description && (
+          <p className="text-xs text-gray-500 line-clamp-2 mb-3 ml-9">
+            {challenge.description}
+          </p>
+        )}
 
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Progress</span>
-            <span>
-              {challenge.current}/{challenge.target}
-            </span>
+        {/* Progress bar */}
+        {challenge.target && (
+          <div className="ml-9 mb-3">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>Progress</span>
+              <span className="font-medium">{progress} / {target}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${isDone ? "bg-emerald-500" : "bg-green-400"}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
           </div>
-
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-emerald-600 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-        </div>
+        )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="ml-9 flex items-center justify-between">
+          <div className="flex items-center gap-1 text-amber-600">
+            <span className="text-sm">⭐</span>
+            <span className="text-sm font-bold">{challenge.reward_points ?? 0}</span>
+            <span className="text-xs text-gray-400">poin</span>
+          </div>
 
-          <span className="text-xs text-gray-400">
-            {challenge.deadline}
-          </span>
-
-          {progress >= 100 ? (
-            <div className="flex items-center gap-1 text-sm text-emerald-600 font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              Selesai
-            </div>
-          ) : (
-            <Button size="sm">
-              Lanjutkan
-            </Button>
-          )}
-
+          <button
+            onClick={() => navigate(`/challenge/${challenge.id}`)}
+            className={`
+              text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors
+              ${isDone
+                ? "bg-gray-100 text-gray-400 cursor-default"
+                : "bg-green-600 text-white hover:bg-green-700"}
+            `}
+            disabled={isDone}
+          >
+            {isDone ? "Sudah Selesai" : "Lihat Detail →"}
+          </button>
         </div>
-
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
-
-export default ChallengeCard;
