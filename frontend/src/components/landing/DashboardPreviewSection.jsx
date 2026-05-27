@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import Button from "@/components/ui/button";
-import dashboardImg from "@/assets/dashboard.jpg";
+import dashboardImg from "@/assets/dashboard.png";
 import { Link } from "react-router-dom";
 
 /**

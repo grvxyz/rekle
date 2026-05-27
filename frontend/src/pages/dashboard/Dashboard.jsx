@@ -1,4 +1,11 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+import {
+  Trophy,
+  Sparkles,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import HeroSection from "../../components/dashboard/HeroSection.jsx";
@@ -24,11 +31,18 @@ function Dashboard() {
     setFavoriteCategory] =
     useState("-");
 
+  const [rewardPopup,
+    setRewardPopup] =
+    useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
 
     const token =
+      localStorage.getItem(
+        "access_token"
+      ) ||
       sessionStorage.getItem(
         "access_token"
       );
@@ -46,6 +60,7 @@ function Dashboard() {
 
     // ADMIN
     if (isSuperuser) {
+
       navigate(
         "/admin/dashboard",
         {
@@ -57,6 +72,8 @@ function Dashboard() {
     }
 
     const fetchAll = async () => {
+
+      let historyData = [];
       try {
 
         // USER
@@ -68,26 +85,64 @@ function Dashboard() {
 
         setUser(userData);
 
-        // HISTORY
+        // ACTIVITY HISTORY
         try {
 
-          const {
-            data: historyData,
-          } = await api.get(
-            "/scan/history"
-          );
+        const response = await api.get(
+          "/actions/activity"
+        );
 
-          const items =
-            historyData.items || [];
+        historyData = response.data || [];
 
-          setHistory(items);
+          setHistory(historyData);
 
-          processInsight(items);
+          // ======================================
+          // REWARD POPUP DETECTOR
+          // ======================================
+
+          const approvedAction =
+            historyData.find(
+              (item) =>
+                item.type === "action" &&
+                item.status === "approved" &&
+                item.points_earned > 0
+            );
+
+          if (approvedAction) {
+
+            const popupKey =
+              `reward_popup_${approvedAction.id}`;
+
+            const alreadyShown =
+              sessionStorage.getItem(
+                popupKey
+              );
+
+            if (!alreadyShown) {
+
+              setRewardPopup({
+                points:
+                  approvedAction.points_earned,
+              });
+
+              sessionStorage.setItem(
+                popupKey,
+                "shown"
+              );
+
+              setTimeout(() => {
+                setRewardPopup(null);
+              }, 4500);
+
+            }
+          }
+
+          processInsight(historyData);
 
         } catch (err) {
 
           console.warn(
-            "History API gagal",
+            "Activity API gagal",
             err
           );
 
@@ -96,27 +151,99 @@ function Dashboard() {
 
         }
 
-          // CHALLENGES
-          try {
+        // CHALLENGES
+        try {
 
-            const {
-              data: challengeData,
-            } = await api.get(
-              "/content?type=challenge"
+        const response = await api.get(
+          "/content?type=challenge"
+        );
+
+        const challengeData =
+          Array.isArray(response.data)
+            ? response.data
+            : response.data.items ||
+              response.data.data ||
+              [];
+
+          // ===== AUTO PROGRESS ENGINE =====
+          const scanCount =
+              historyData.filter(
+                (item) =>
+                  item.type === "scan"
+              ).length;
+
+            const actionCount =
+              historyData.filter(
+                (item) =>
+                  item.type === "action"
+              ).length;
+
+          const enrichedChallenges =
+            challengeData.map(
+              (challenge) => {
+
+                let current = 0;
+
+                const title =
+                  (
+                    challenge.title || ""
+                  ).toLowerCase();
+
+                const description =
+                  (
+                    challenge.description || ""
+                  ).toLowerCase();
+
+                // SCAN CHALLENGE
+                if (
+                  title.includes("scan") ||
+                  description.includes("scan")
+                ) {
+
+                  current = scanCount;
+
+                }
+
+                // ACTION CHALLENGE
+                else if (
+                  title.includes("aksi") ||
+                  title.includes("action") ||
+                  title.includes("reuse") ||
+                  title.includes("kompos") ||
+                  title.includes("daur ulang")
+                ) {
+
+                  current = actionCount;
+
+                }
+
+                const target =
+                  challenge.target || 1;
+
+                return {
+                  ...challenge,
+                  current_progress:
+                    current,
+                  completed:
+                    current >= target,
+                };
+              }
             );
 
-            setChallenges(challengeData);
+          setChallenges(
+            enrichedChallenges
+          );
 
-          } catch (err) {
+        } catch (err) {
 
-            console.warn(
-              "Challenge API gagal",
-              err
-            );
+          console.warn(
+            "Challenge API gagal",
+            err
+          );
 
-            setChallenges([]);
+          setChallenges([]);
 
-          }
+        }
 
       } catch (err) {
 
@@ -136,19 +263,30 @@ function Dashboard() {
     items = []
   ) => {
 
-    if (!items.length) {
+    const scanItems =
+      items.filter(
+        (item) =>
+          item.type === "scan"
+      );
+
+    if (!scanItems.length) {
+
       setFavoriteCategory("-");
       return;
+
     }
 
     const categoryCount = {};
 
-    items.forEach((item) => {
+    scanItems.forEach((item) => {
 
-      categoryCount[item.result] =
+      const result =
+        item.title || "Lainnya";
+
+      categoryCount[result] =
         (
           categoryCount[
-            item.result
+            result
           ] || 0
         ) + 1;
 
@@ -255,6 +393,7 @@ function Dashboard() {
 
   // LOADING
   if (!user) {
+
     return (
       <div className="min-h-screen flex items-center justify-center">
 
@@ -287,6 +426,54 @@ function Dashboard() {
             favoriteCategory
           }
         />
+
+        {/* GAMIFICATION INFO */}
+        <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-3xl p-6 text-white shadow-sm">
+
+          <h2 className="text-xl font-bold">
+            Cara Mendapatkan Poin 
+          </h2>
+
+          <p className="text-sm text-emerald-50 mt-1">
+            Semakin aktif mengelola sampah,
+            semakin banyak poin & reward yang kamu dapatkan.
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-4 mt-5">
+
+            <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+              <p className="text-sm text-emerald-100">
+                Scan Sampah
+              </p>
+
+              <h3 className="text-2xl font-bold mt-1">
+                +10 Poin
+              </h3>
+            </div>
+
+            <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+              <p className="text-sm text-emerald-100">
+                Action Diverifikasi
+              </p>
+
+              <h3 className="text-2xl font-bold mt-1">
+                +50 Poin
+              </h3>
+            </div>
+
+            <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+              <p className="text-sm text-emerald-100">
+                Challenge Selesai
+              </p>
+
+              <h3 className="text-2xl font-bold mt-1">
+                +200 Poin
+              </h3>
+            </div>
+
+          </div>
+
+        </div>
 
         {/* WEEKLY CHALLENGE */}
         <WeeklyChallenge
@@ -326,7 +513,7 @@ function Dashboard() {
 
           </div>
 
-          {/* AI INSIGHT */}
+          {/* INSIGHT */}
           <div>
 
             <InsightCard
@@ -341,6 +528,65 @@ function Dashboard() {
         <RecentHistory
           history={history}
         />
+
+{/* REWARD POPUP */}
+{rewardPopup && (
+
+  <div className="fixed top-6 right-6 z-[100] animate-in slide-in-from-top duration-500">
+
+    <div className="bg-white border border-emerald-100 shadow-xl rounded-3xl p-5 w-[320px]">
+
+      <div className="flex items-start gap-4">
+
+        <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0">
+
+          <Trophy className="w-7 h-7 text-emerald-600" />
+
+        </div>
+
+        <div className="space-y-1 flex-1">
+
+          <div className="flex items-center gap-2">
+
+            <h3 className="font-bold text-slate-900">
+              Reward Ditambahkan
+            </h3>
+
+            <Sparkles className="w-4 h-4 text-amber-500" />
+
+          </div>
+
+          <p className="text-sm text-slate-500 leading-relaxed">
+
+            Action berhasil diverifikasi admin.
+
+          </p>
+
+          <div className="pt-1">
+
+            <span className="inline-flex items-center gap-1 text-2xl font-bold text-emerald-600">
+
+              +{
+                rewardPopup.points
+              }
+
+              <span className="text-base font-semibold">
+                poin
+              </span>
+
+            </span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+)}
 
       </div>
 

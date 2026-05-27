@@ -1,19 +1,12 @@
-/**
- * ChallengePage.jsx
- *
- * Perubahan:
- * - Leaderboard: fallback ke GET /admin/users sorted by reward_points
- * - ChallengeCard: hanya tampil ringkas, navigasi ke /challenge/:id
- * - Animasi staggered via anime.js (sama seperti sebelumnya)
- */
-
 import { useEffect, useRef, useState } from "react";
 
 import ChallengeHero    from "../../components/challenge/ChallengeHero.jsx";
 import ChallengeSummary from "../../components/challenge/ChallengeSummary.jsx";
 import ChallengeCard    from "../../components/challenge/ChallengeCard.jsx";
 import LeaderboardCard  from "../../components/challenge/LeaderboardCard.jsx";
-
+import {
+  calculateChallengeProgress,
+} from "@/utils/challengeProgress";
 import api from "../../lib/axios.js";
 
 async function getAnime() {
@@ -40,54 +33,134 @@ export default function ChallengePage() {
         setUser(userData);
 
         // Hanya ambil challenge yang active
-        const { data: challengeData } = await api.get("/content?type=challenge&status=active");
-        setChallenges(challengeData);
+// ======================================
+// FETCH ACTIVE CHALLENGES
+// ======================================
 
-        // ── Leaderboard: coba beberapa endpoint ──
-        let topUsers = [];
+const response =
+  await api.get(
+    "/content?type=challenge&status=active"
+  );
 
-        // Coba 1: /admin/analytics/insights (jika ada top_users)
-        try {
-          const { data: insights } = await api.get("/admin/analytics/insights");
-          topUsers = insights?.top_users ?? insights?.data?.top_users ?? [];
-        } catch { /* lanjut */ }
+const challengeData =
+  Array.isArray(response.data)
+    ? response.data
+    : response.data.items ||
+      response.data.data ||
+      [];
 
-        // Coba 2: /admin/users — sort by reward_points di client
-        if (!topUsers.length) {
-          try {
-            const { data: allUsers } = await api.get("/admin/users?limit=50");
-            const users = Array.isArray(allUsers) ? allUsers : allUsers?.items ?? [];
-            topUsers = users
-              .filter((u) => (u.reward_points ?? u.total_points ?? 0) > 0)
-              .sort((a, b) =>
-                (b.reward_points ?? b.total_points ?? 0) -
-                (a.reward_points ?? a.total_points ?? 0)
-              )
-              .slice(0, 10);
-          } catch { /* lanjut */ }
-        }
+// ======================================
+// FETCH USER ACTIVITY
+// ======================================
 
-        // Normalize
-        const normalized = topUsers.map((u, i) => ({
-          id:     u.id ?? i,
-          name:   u.full_name ?? u.username ?? u.name ?? u.email ?? `Pengguna ${i + 1}`,
-          points: u.reward_points ?? u.total_points ?? u.points ?? u.score ?? 0,
-          isMe:   u.id === userData?.id,
-        }));
+const {
+  data: activityData,
+} = await api.get(
+  "/actions/activity?limit=200"
+);
 
-        // Pastikan user sendiri ada di list
-        const alreadyIn = normalized.some((u) => u.isMe);
-        if (!alreadyIn && userData) {
-          normalized.push({
-            id:     userData.id,
-            name:   userData.full_name ?? userData.username ?? userData.email ?? "Kamu",
-            points: userData.reward_points ?? userData.total_points ?? 0,
-            isMe:   true,
-          });
-        }
+// ======================================
+// COUNT ACTIVITY
+// ======================================
 
-        normalized.sort((a, b) => b.points - a.points);
-        setLeaderboard(normalized.slice(0, 10));
+const scanItems =
+  activityData.filter(
+    (item) =>
+      item.type === "scan"
+  );
+
+// hanya scan unik berdasarkan title + created_at
+const uniqueScans =
+  Array.from(
+    new Map(
+      scanItems.map(
+        (item) => [
+          `${item.title}_${item.created_at}`,
+          item,
+        ]
+      )
+    ).values()
+  );
+
+const scanCount =
+  uniqueScans.length;
+
+const actionItems =
+  activityData.filter(
+    (item) =>
+      item.type === "action"
+  );
+
+const uniqueActions =
+  Array.from(
+    new Map(
+      actionItems.map(
+        (item) => [
+          `${item.title}_${item.created_at}`,
+          item,
+        ]
+      )
+    ).values()
+  );
+
+const actionCount =
+  uniqueActions.length;
+
+// ======================================
+// ENRICH CHALLENGE
+// ======================================
+const enrichedChallenges =
+  challengeData.map(
+    (challenge) => {
+
+      const current =
+        calculateChallengeProgress(
+          activityData,
+          challenge
+        );
+
+      const target =
+        challenge.target || 1;
+
+      return {
+        ...challenge,
+
+        current,
+
+        completed:
+          current >= target,
+      };
+    }
+  );
+
+setChallenges(
+  enrichedChallenges
+);
+// ======================================
+// USER LEADERBOARD
+// ======================================
+
+const leaderboardData = [
+  {
+    id: userData.id,
+    name:
+      userData.full_name ||
+      userData.username ||
+      userData.email ||
+      "Kamu",
+
+    points:
+      userData.reward_points ||
+      userData.total_points ||
+      0,
+
+    isMe: true,
+  },
+];
+
+setLeaderboard(
+  leaderboardData
+);
 
       } catch (err) {
         console.error("Challenge fetch error:", err);

@@ -1,17 +1,8 @@
-/**
- * ChallengeDetail.jsx
- *
- * Halaman detail satu challenge.
- * - Menampilkan info lengkap: judul, deskripsi, tipe, target, reward
- * - Form untuk submit aksi (POST /actions/) dengan proof image opsional
- * - Poin otomatis dihitung dari reward_points challenge
- *
- * Route: /challenge/:id
- */
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams }       from "react-router-dom";
-
+import {
+  calculateChallengeProgress,
+} from "@/utils/challengeProgress";
 import api from "../../lib/axios.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -42,7 +33,7 @@ export default function ChallengeDetail() {
   // data
   const [challenge, setChallenge]   = useState(null);
   const [user, setUser]             = useState(null);
-  const [predictions, setPredictions] = useState([]);   // untuk dropdown prediction_id
+  const [activityData, setActivityData] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [notFound, setNotFound]     = useState(false);
 
@@ -86,9 +77,23 @@ export default function ChallengeDetail() {
 
         // Fetch riwayat scan user untuk dropdown prediction_id
         try {
-          const { data: scanData } = await api.get("/predictions/history");
-          const items = scanData?.items ?? scanData ?? [];
-          setPredictions(items.slice(0, 20));
+          const { data: scanData } = await api.get("/actions/activity?limit=200")
+          const items =
+  scanData?.items ??
+  scanData ??
+  [];
+  setActivityData(items);
+
+// hanya ambil scan
+const scanPredictions =
+  items.filter(
+    (item) =>
+      item.type === "scan"
+  );
+
+setPredictions(
+  scanPredictions
+);
         } catch { /* tidak wajib */ }
 
       } catch (err) {
@@ -230,7 +235,7 @@ export default function ChallengeDetail() {
   // ── main render ──────────────────────────────────────────────────────────────
   const typeMeta = TYPE_META[challenge.challenge_type] ?? { label: challenge.challenge_type, icon: "🏆", hint: "" };
   const isDone   = challenge.completed;
-  const progress = challenge.current ?? 0;
+  const progress = calculateChallengeProgress( activityData, challenge);
   const target   = challenge.target  ?? null;
   const pct      = target ? Math.min(100, Math.round((progress / target) * 100)) : null;
 

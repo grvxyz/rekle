@@ -1,377 +1,850 @@
-import { useEffect, useState, useCallback } from "react";
+import {
+  useEffect,
+  useState,
+  useMemo,
+} from "react";
+
+import {
+  ArrowLeft,
+  Brain,
+  Recycle,
+  Clock3,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Trophy,
+  X,
+} from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
-import { ScanLine, Zap, ChevronRight } from "lucide-react";
+
 import api from "@/lib/axios";
+
 import dayjs from "dayjs";
 
 // ======================================================
-// HELPERS
+// FILTERS
 // ======================================================
 
-const CATEGORY_LABEL = {
-  organik:          "Sampah Organik",
-  plastik_pet:      "Plastik PET",
-  plastik_hdpe:     "Plastik HDPE",
-  plastik_campuran: "Plastik Campuran",
-  kertas_bersih:    "Kertas Bersih",
-  kertas_kotor:     "Kertas Kotor",
-  kaca_utuh:        "Kaca Utuh",
-  kaca_pecah:       "Kaca Pecah",
-};
-
-const ACTION_LABEL = {
-  kompos:      "Kompos",
-  bank_sampah: "Bank Sampah",
-  daur_ulang:  "Daur Ulang",
-  eco_brick:   "Eco Brick",
-  reuse:       "Reuse",
-  tidak_layak: "Tidak Layak Daur Ulang",
-  khusus:      "Penanganan Khusus",
-};
-
-const ACTION_COLOR = {
-  kompos:      "bg-lime-100 text-lime-700",
-  bank_sampah: "bg-blue-100 text-blue-700",
-  daur_ulang:  "bg-emerald-100 text-emerald-700",
-  eco_brick:   "bg-orange-100 text-orange-700",
-  reuse:       "bg-amber-100 text-amber-700",
-  tidak_layak: "bg-gray-100 text-gray-600",
-  khusus:      "bg-red-100 text-red-600",
-};
+const FILTERS = [
+  {
+    key: "all",
+    label: "Semua",
+  },
+  {
+    key: "scan",
+    label: "Scan",
+  },
+  {
+    key: "action",
+    label: "Action",
+  },
+  {
+    key: "approved",
+    label: "Approved",
+  },
+  {
+    key: "pending",
+    label: "Pending",
+  },
+];
 
 // ======================================================
-// HISTORY PAGE
+// COMPONENT
 // ======================================================
-
-const LIMIT = 15;
 
 const HistoryPage = () => {
-  const navigate = useNavigate();
-  const [tab, setTab] = useState("scan"); // "scan" | "action"
 
-  // ── SCAN STATE ────────────────────────────────────────
-  const [scans, setScans]           = useState([]);
-  const [scanTotal, setScanTotal]   = useState(0);
-  const [scanPage, setScanPage]     = useState(1);
-  const [scanLoading, setScanLoading] = useState(false);
-  const [scanError, setScanError]   = useState("");
+  const navigate =
+    useNavigate();
 
-  // ── ACTION STATE ──────────────────────────────────────
-  const [actions, setActions]         = useState([]);
-  const [actionPage, setActionPage]   = useState(1);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState("");
-  const [hasMoreActions, setHasMoreActions] = useState(true);
+  const [activities,
+    setActivities] =
+    useState([]);
 
-  // ======================================================
-  // FETCH SCAN HISTORY
-  // ======================================================
+  const [loading,
+    setLoading] =
+    useState(true);
 
-  const fetchScans = useCallback(async () => {
-    try {
-      setScanLoading(true);
-      setScanError("");
+  const [error,
+    setError] =
+    useState("");
 
-      const skip = (scanPage - 1) * LIMIT;
-      const { data } = await api.get("/scan/history", {
-        params: { skip, limit: LIMIT },
-      });
+  const [filter,
+    setFilter] =
+    useState("all");
 
-      setScans(Array.isArray(data.items) ? data.items : []);
-      setScanTotal(data.total ?? 0);
-    } catch (err) {
-      console.error("[HistoryPage] Scan fetch error:", err);
-      setScanError("Gagal mengambil riwayat scan");
-    } finally {
-      setScanLoading(false);
-    }
-  }, [scanPage]);
+  const [selectedActivity,
+    setSelectedActivity] =
+    useState(null);
+
+  const [detailLoading,
+    setDetailLoading] =
+    useState(false);
 
   // ======================================================
-  // FETCH ACTION HISTORY
+  // FETCH
   // ======================================================
 
-  const fetchActions = useCallback(async () => {
-    try {
-      setActionLoading(true);
-      setActionError("");
+  useEffect(() => {
 
-      const skip = (actionPage - 1) * LIMIT;
-      const { data } = await api.get("/actions/", {
-        params: { skip, limit: LIMIT },
-      });
+    const fetchHistory =
+      async () => {
 
-      const items = Array.isArray(data) ? data : [];
-      setActions(items);
-      setHasMoreActions(items.length === LIMIT);
-    } catch (err) {
-      console.error("[HistoryPage] Action fetch error:", err);
-      setActionError("Gagal mengambil riwayat aksi");
-    } finally {
-      setActionLoading(false);
-    }
-  }, [actionPage]);
+        try {
 
-  useEffect(() => { fetchScans(); }, [fetchScans]);
-  useEffect(() => { fetchActions(); }, [fetchActions]);
+          setLoading(true);
+          setError("");
 
-  const scanTotalPages = Math.ceil(scanTotal / LIMIT);
+          const response =
+            await api.get(
+              "/actions/activity"
+            );
+
+          setActivities(
+            response.data || []
+          );
+
+        } catch (err) {
+
+          console.error(err);
+
+          setError(
+            "Gagal mengambil riwayat aktivitas"
+          );
+
+        } finally {
+
+          setLoading(false);
+
+        }
+      };
+
+    fetchHistory();
+
+  }, []);
+
+  // ======================================================
+  // FILTERED DATA
+  // ======================================================
+
+  const filteredActivities =
+    useMemo(() => {
+
+      switch (filter) {
+
+        case "scan":
+          return activities.filter(
+            (item) =>
+              item.type === "scan"
+          );
+
+        case "action":
+          return activities.filter(
+            (item) =>
+              item.type === "action"
+          );
+
+        case "approved":
+          return activities.filter(
+            (item) =>
+              item.status ===
+              "approved"
+          );
+
+        case "pending":
+          return activities.filter(
+            (item) =>
+              item.status ===
+              "pending"
+          );
+
+        default:
+          return activities;
+      }
+
+    }, [activities, filter]);
+
+  // ======================================================
+  // DETAIL
+  // ======================================================
+
+  const handleOpenDetail =
+    async (item) => {
+
+      try {
+
+        setDetailLoading(true);
+
+        const response =
+          await api.get(
+            `/actions/activity/${item.type}/${item.id}`
+          );
+
+        setSelectedActivity(
+          response.data
+        );
+
+      } catch (err) {
+
+        console.error(err);
+
+      } finally {
+
+        setDetailLoading(false);
+
+      }
+    };
+
+  // ======================================================
+  // HELPERS
+  // ======================================================
+
+  const getActivityIcon =
+    (type) => {
+
+      switch (type) {
+
+        case "action":
+          return Recycle;
+
+        case "scan":
+        default:
+          return Brain;
+      }
+    };
+
+  const getActivityColor =
+    (type) => {
+
+      switch (type) {
+
+        case "action":
+          return {
+            bg: "bg-violet-50",
+            text: "text-violet-700",
+            badge:
+              "bg-violet-50 text-violet-700",
+          };
+
+        case "scan":
+        default:
+          return {
+            bg: "bg-emerald-50",
+            text:
+              "text-emerald-700",
+            badge:
+              "bg-emerald-50 text-emerald-700",
+          };
+      }
+    };
+
+  const getStatusBadge =
+    (status) => {
+
+      switch (status) {
+
+        case "approved":
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+
+              <CheckCircle2 className="w-3.5 h-3.5" />
+
+              Approved
+
+            </span>
+          );
+
+        case "pending":
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+
+              <Loader2 className="w-3.5 h-3.5" />
+
+              Pending
+
+            </span>
+          );
+
+        case "rejected":
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">
+
+              <XCircle className="w-3.5 h-3.5" />
+
+              Rejected
+
+            </span>
+          );
+
+        default:
+          return null;
+      }
+    };
 
   // ======================================================
   // RENDER
   // ======================================================
 
   return (
-    <section className="min-h-screen bg-slate-50 py-12 px-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <section className="min-h-screen bg-slate-50 py-10 px-6">
+
+      <div className="max-w-4xl mx-auto space-y-6">
 
         {/* HEADER */}
-        <h1 className="text-3xl font-bold text-slate-800">Riwayat</h1>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
 
-        {/* TAB */}
-        <div className="flex bg-white border rounded-2xl overflow-hidden shadow-sm">
-          <TabButton
-            active={tab === "scan"}
-            onClick={() => setTab("scan")}
-            icon={<ScanLine size={16} />}
-            label="Scan"
-            count={scanTotal}
-          />
-          <TabButton
-            active={tab === "action"}
-            onClick={() => setTab("action")}
-            icon={<Zap size={16} />}
-            label="Aksi"
-          />
+          <div className="space-y-1">
+
+            <button
+              onClick={() =>
+                navigate(-1)
+              }
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+            >
+
+              <ArrowLeft className="w-4 h-4" />
+
+              Kembali
+
+            </button>
+
+            <h1 className="text-3xl font-bold text-slate-900">
+              Riwayat Aktivitas
+            </h1>
+
+            <p className="text-sm text-slate-500">
+              Semua scan dan action yang pernah dilakukan pengguna
+            </p>
+
+          </div>
+
+          <div className="bg-white rounded-2xl border px-4 py-3 shadow-sm">
+
+            <p className="text-xs text-slate-400">
+              Total Aktivitas
+            </p>
+
+            <h2 className="text-2xl font-bold text-slate-900">
+              {activities.length}
+            </h2>
+
+          </div>
+
         </div>
 
-        {/* SCAN TAB */}
-        {tab === "scan" && (
-          <>
-            {scanError && <ErrorBanner message={scanError} />}
+        {/* FILTER */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
 
-            {scanLoading ? (
-              <SkeletonList count={5} />
-            ) : scans.length === 0 ? (
-              <EmptyState
-                message="Belum ada riwayat scan"
-                action="Scan sekarang"
-                onAction={() => navigate("/scan")}
-              />
-            ) : (
-              <div className="space-y-3">
-                {scans.map((scan) => (
-                  <ScanCard key={scan.id} scan={scan} />
-                ))}
-              </div>
-            )}
+          {FILTERS.map((item) => (
 
-            {/* PAGINATION SCAN */}
-            {!scanLoading && scanTotalPages > 1 && (
-              <Pagination
-                page={scanPage}
-                totalPages={scanTotalPages}
-                onPrev={() => setScanPage((p) => Math.max(1, p - 1))}
-                onNext={() => setScanPage((p) => Math.min(scanTotalPages, p + 1))}
-              />
-            )}
-          </>
+            <button
+              key={item.key}
+              onClick={() =>
+                setFilter(item.key)
+              }
+              className={`px-4 py-2 rounded-2xl text-sm font-medium whitespace-nowrap transition-colors ${
+                filter === item.key
+                  ? "bg-emerald-600 text-white"
+                  : "bg-white border text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+
+              {item.label}
+
+            </button>
+
+          ))}
+
+        </div>
+
+        {/* ERROR */}
+        {error && (
+
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-sm">
+
+            {error}
+
+          </div>
+
         )}
 
-        {/* ACTION TAB */}
-        {tab === "action" && (
-          <>
-            {actionError && <ErrorBanner message={actionError} />}
+        {/* LOADING */}
+        {loading ? (
 
-            {actionLoading ? (
-              <SkeletonList count={5} />
-            ) : actions.length === 0 ? (
-              <EmptyState
-                message="Belum ada riwayat aksi"
-                action="Pilih aksi"
-                onAction={() => navigate("/scan")}
-              />
-            ) : (
-              <div className="space-y-3">
-                {actions.map((action) => (
-                  <ActionCard key={action.id} action={action} />
-                ))}
-              </div>
+          <div className="space-y-4 animate-pulse">
+
+            {[...Array(5)].map(
+              (_, i) => (
+
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border p-5 space-y-3"
+                >
+
+                  <div className="h-4 bg-slate-200 rounded w-40" />
+
+                  <div className="h-3 bg-slate-200 rounded w-64" />
+
+                </div>
+              )
             )}
 
-            {/* PAGINATION ACTION */}
-            {!actionLoading && (actionPage > 1 || hasMoreActions) && (
-              <Pagination
-                page={actionPage}
-                totalPages={null}
-                onPrev={() => setActionPage((p) => Math.max(1, p - 1))}
-                onNext={() => setActionPage((p) => p + 1)}
-                disableNext={!hasMoreActions}
-              />
+          </div>
+
+        ) : filteredActivities.length === 0 ? (
+
+          <div className="bg-white rounded-3xl border p-12 text-center">
+
+            <Filter className="w-10 h-10 text-slate-300 mx-auto" />
+
+            <h2 className="mt-4 text-xl font-semibold text-slate-800">
+              Tidak Ada Aktivitas
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Belum ada aktivitas yang sesuai dengan filter ini.
+            </p>
+
+          </div>
+
+        ) : (
+
+          <div className="space-y-4">
+
+            {filteredActivities.map(
+              (item, index) => {
+
+                const Icon =
+                  getActivityIcon(
+                    item.type
+                  );
+
+                const colors =
+                  getActivityColor(
+                    item.type
+                  );
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() =>
+                      handleOpenDetail(
+                        item
+                      )
+                    }
+                    className="relative w-full text-left flex gap-4 rounded-3xl border border-slate-200 bg-white p-5 transition-all hover:border-emerald-100 hover:shadow-sm hover:-translate-y-0.5"
+                  >
+
+                    {/* TIMELINE */}
+                    {index !==
+                      filteredActivities.length - 1 && (
+
+                      <div className="absolute left-[35px] top-20 h-full w-px bg-slate-100" />
+
+                    )}
+
+                    {/* ICON */}
+                    <div className={`relative z-10 w-12 h-12 rounded-2xl ${colors.bg} flex items-center justify-center shrink-0`}>
+
+                      <Icon className={`w-5 h-5 ${colors.text}`} />
+
+                    </div>
+
+                    {/* CONTENT */}
+                    <div className="flex-1 space-y-4 min-w-0">
+
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+
+                        <div className="space-y-2">
+
+                          <div className="flex items-center gap-2 flex-wrap">
+
+                            <h3 className="font-semibold text-slate-900">
+                              {item.title}
+                            </h3>
+
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${colors.badge}`}>
+
+                              {item.type ===
+                              "scan"
+                                ? "Scan"
+                                : "Action"}
+
+                            </span>
+
+                            {getStatusBadge(
+                              item.status
+                            )}
+
+                          </div>
+
+                          <p className="text-sm text-slate-600 leading-relaxed">
+
+                            {item.description ||
+                              "-"}
+
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-sm text-slate-400 shrink-0">
+                          <Clock3 className="w-4 h-4" />
+                          <span>
+                            {dayjs(
+                              item.created_at
+                            ).format(
+                              "DD MMM YYYY, HH:mm"
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* FOOTER */}
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className={`flex items-center gap-2 text-sm font-medium ${colors.text}`}>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>
+                            {item.type ===
+                            "scan"
+                              ? "AI Scan Completed"
+                              : "Action Submitted"}
+                          </span>
+                        </div>
+                        {item.points_earned >
+                          0 && (
+                          <div className="flex items-center gap-1 text-amber-600 text-sm font-semibold">
+                            <Trophy className="w-4 h-4" />
+                            +{
+                              item.points_earned
+                            } poin
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
             )}
-          </>
+          </div>
         )}
-
       </div>
+
+      {/* MODAL */}
+      {selectedActivity && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* HEADER */}
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Detail Aktivitas
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Informasi lengkap aktivitas pengguna
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setSelectedActivity(
+                    null
+                  )
+                }
+                className="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            {/* CONTENT */}
+            <div className="p-6 space-y-6">
+              {/* IMAGE */}
+              {(selectedActivity.image_path ||
+                selectedActivity.prediction?.image_path) && (
+                <img
+                  src={`http://localhost:8000/${
+                    selectedActivity.image_path ||
+                    selectedActivity.prediction?.image_path
+                  }`}
+                  alt="Activity"
+                  className="w-full h-72 object-cover rounded-2xl border"
+                />
+              )}
+
+              {/* AI */}
+              <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Brain className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-semibold text-emerald-900">
+                    Hasil AI Scan
+                  </h3>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">
+                      Kategori
+                    </span>
+                    <span className="font-semibold text-slate-800">
+                      {selectedActivity.result ||
+                        selectedActivity.prediction?.result ||
+                        "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">
+                      Confidence
+                    </span>
+                    <span className="font-semibold text-slate-800">
+                      {(
+                        (
+                          selectedActivity.confidence ||
+                          selectedActivity.prediction?.confidence ||
+                          0
+                        ) * 100
+                      ).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+      {/* ACTION */}
+      {(selectedActivity.action ||
+        selectedActivity.type === "action") && (
+        <div className="space-y-4">
+
+          {/* STATUS CARD */}
+          <div
+            className={`rounded-2xl border p-5 ${
+              (
+                selectedActivity.action?.status ||
+                selectedActivity.status
+              ) === "approved"
+                ? "bg-emerald-50 border-emerald-100"
+                : (
+                    selectedActivity.action?.status ||
+                    selectedActivity.status
+                  ) === "rejected"
+                ? "bg-red-50 border-red-100"
+                : "bg-amber-50 border-amber-100"
+            }`}
+          >
+
+            <div className="flex items-start justify-between gap-4">
+
+              <div className="space-y-2">
+
+                <h3 className="font-semibold text-slate-900">
+                  Status Verifikasi
+                </h3>
+
+                {/* APPROVED */}
+                {(
+                  selectedActivity.action?.status ||
+                  selectedActivity.status
+                ) === "approved" && (
+
+                  <div className="space-y-2">
+
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium">
+
+                      <CheckCircle2 className="w-4 h-4" />
+
+                      Action Approved
+
+                    </div>
+
+                    <p className="text-sm text-emerald-700 leading-relaxed">
+
+                      Action berhasil diverifikasi admin.
+                      Reward dan poin sudah ditambahkan ke akun pengguna.
+
+                    </p>
+
+                    {(
+                      selectedActivity.verified_at
+                    ) && (
+
+                      <p className="text-xs text-emerald-600">
+
+                        Diverifikasi pada{" "}
+                        {dayjs(
+                          selectedActivity.verified_at
+                        ).format(
+                          "DD MMM YYYY, HH:mm"
+                        )}
+
+                      </p>
+
+                    )}
+
+                  </div>
+
+                )}
+
+                {/* PENDING */}
+                {(
+                  selectedActivity.action?.status ||
+                  selectedActivity.status
+                ) === "pending" && (
+
+                  <div className="space-y-2">
+
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 text-sm font-medium">
+
+                      <Loader2 className="w-4 h-4" />
+
+                      Menunggu Verifikasi
+
+                    </div>
+
+                    <p className="text-sm text-amber-700 leading-relaxed">
+
+                      Bukti action sedang direview admin.
+                      Reward akan diberikan setelah proses verifikasi selesai.
+                    </p>
+                  </div>
+                )}
+
+                {/* REJECTED */}
+                {(
+                  selectedActivity.action?.status ||
+                  selectedActivity.status
+                ) === "rejected" && (
+
+                  <div className="space-y-3">
+
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-sm font-medium">
+                      <XCircle className="w-4 h-4" />
+                      Action Rejected
+                    </div>
+
+                    <p className="text-sm text-red-700 leading-relaxed">
+                      Action belum dapat diverifikasi.
+                      Periksa alasan penolakan berikut sebelum mengirim ulang bukti.
+                    </p>
+
+                    {selectedActivity.rejection_reason && (
+                      <div className="bg-white border border-red-200 rounded-xl p-4">
+                        <p className="text-xs font-medium text-red-500 uppercase tracking-wide mb-2">
+                          Alasan Penolakan
+                        </p>
+                        <p className="text-sm text-slate-700 leading-relaxed">
+                          {selectedActivity.rejection_reason}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ACTION DETAIL */}
+          <div className="bg-violet-50 rounded-2xl border border-violet-100 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Recycle className="w-5 h-5 text-violet-600" />
+              <h3 className="font-semibold text-violet-900">
+                Detail Action
+              </h3>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-slate-500">
+                  Jenis Action
+                </p>
+                <p className="font-semibold text-slate-800 capitalize mt-1">
+                  {selectedActivity.action?.action_type ||
+                    selectedActivity.action_type ||
+                    "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-slate-500">
+                  Route
+                </p>
+                <p className="font-semibold text-slate-800 capitalize mt-1">
+                  {selectedActivity.action?.route ||
+                    selectedActivity.route ||
+                    "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-slate-500">
+                  Reward Poin
+                </p>
+                <p className="font-semibold text-amber-600 mt-1 flex items-center gap-1">
+                  <Trophy className="w-4 h-4" />
+                  +{
+                    selectedActivity.action?.points_earned ||
+                    selectedActivity.points_earned ||
+                    0
+                  } poin
+                </p>
+              </div>
+
+              <div>
+                <p className="text-slate-500">
+                  Saldo Reward
+                </p>
+                <p className="font-semibold text-emerald-600 mt-1">
+                  Rp{" "}
+                  {(
+                    selectedActivity.balance_earned || 0
+                  ).toLocaleString("id-ID")}
+                </p>
+              </div>
+            </div>
+
+            {/* NOTES */}
+            {(selectedActivity.notes ||
+              selectedActivity.action?.notes) && (
+              <div className="mt-5 pt-5 border-t border-violet-100">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+                  Catatan User
+                </p>
+                <p className="text-sm text-slate-700 leading-relaxed">
+
+                  {selectedActivity.notes ||
+                    selectedActivity.action?.notes}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* PROOF IMAGE */}
+          {(selectedActivity.proof_image_path ||
+            selectedActivity.action?.proof_image_path) && (
+            <div className="bg-slate-50 border rounded-2xl p-5 space-y-4">
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  Bukti Action
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Foto bukti yang diunggah pengguna
+                </p>
+              </div>
+              <img
+                src={`http://localhost:8000/${
+                  selectedActivity.proof_image_path ||
+                  selectedActivity.action?.proof_image_path
+                }`}
+                alt="Proof"
+                className="w-full h-72 object-cover rounded-2xl border"
+              />
+            </div>
+          )}
+        </div>
+      )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
-
-// ======================================================
-// SCAN CARD
-// ======================================================
-
-const ScanCard = ({ scan }) => (
-  <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
-    <div className="flex items-center justify-between">
-      <span className="font-semibold text-slate-800 text-sm">
-        {CATEGORY_LABEL[scan.result] ?? scan.result}
-      </span>
-      <span className="text-xs text-slate-400">
-        {dayjs(scan.created_at).format("DD MMM YYYY, HH:mm")}
-      </span>
-    </div>
-
-    <div className="flex items-center gap-3 flex-wrap">
-      {/* Confidence bar */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-          <div
-            className="bg-green-500 h-1.5 rounded-full transition-all"
-            style={{ width: `${Math.round((scan.confidence ?? 0) * 100)}%` }}
-          />
-        </div>
-        <span className="text-xs text-slate-500 shrink-0">
-          {Math.round((scan.confidence ?? 0) * 100)}%
-        </span>
-      </div>
-
-      {/* Rekomendasi */}
-      {scan.recommendation && (
-        <span className="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full shrink-0">
-          → {ACTION_LABEL[scan.recommendation] ?? scan.recommendation}
-        </span>
-      )}
-    </div>
-
-    {/* Not confident warning */}
-    {scan.is_confident === false && (
-      <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
-        ⚠ Hasil kurang yakin, coba foto ulang dengan pencahayaan lebih baik
-      </p>
-    )}
-  </div>
-);
-
-// ======================================================
-// ACTION CARD
-// ======================================================
-
-const ActionCard = ({ action }) => (
-  <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
-    <div className="flex items-center justify-between gap-2 flex-wrap">
-      <div className="flex items-center gap-2">
-        <span
-          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-            ACTION_COLOR[action.action_type] ?? "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {ACTION_LABEL[action.action_type] ?? action.action_type}
-        </span>
-
-        {action.partner_name && (
-          <span className="text-xs text-slate-500">
-            @ {action.partner_name}
-          </span>
-        )}
-      </div>
-
-      <span className="text-xs font-medium text-green-600">
-        +{action.points_earned ?? 0} poin
-      </span>
-    </div>
-
-    {action.notes && (
-      <p className="text-xs text-slate-500 italic">"{action.notes}"</p>
-    )}
-
-    <p className="text-xs text-slate-400">
-      {dayjs(action.created_at).format("DD MMM YYYY, HH:mm")}
-    </p>
-  </div>
-);
-
-// ======================================================
-// SUBCOMPONENTS
-// ======================================================
-
-const TabButton = ({ active, onClick, icon, label, count }) => (
-  <button
-    onClick={onClick}
-    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-      active
-        ? "bg-green-600 text-white"
-        : "text-slate-500 hover:bg-slate-50"
-    }`}
-  >
-    {icon} {label}
-    {count > 0 && (
-      <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-slate-100"}`}>
-        {count}
-      </span>
-    )}
-  </button>
-);
-
-const Pagination = ({ page, totalPages, onPrev, onNext, disableNext = false }) => (
-  <div className="flex justify-center gap-2">
-    <button
-      onClick={onPrev}
-      disabled={page === 1}
-      className="px-4 py-2 rounded-xl border text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
-    >
-      ← Prev
-    </button>
-    <span className="px-4 py-2 text-sm text-gray-600">
-      {totalPages ? `${page} / ${totalPages}` : `Hal. ${page}`}
-    </span>
-    <button
-      onClick={onNext}
-      disabled={disableNext || (totalPages && page >= totalPages)}
-      className="px-4 py-2 rounded-xl border text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
-    >
-      Next →
-    </button>
-  </div>
-);
-
-const ErrorBanner = ({ message }) => (
-  <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-2xl text-sm text-center">
-    {message}
-  </div>
-);
-
-const EmptyState = ({ message, action, onAction }) => (
-  <div className="bg-white rounded-2xl border p-10 text-center space-y-3">
-    <p className="text-slate-400 text-sm">{message}</p>
-    <button
-      onClick={onAction}
-      className="text-sm text-green-600 font-medium hover:underline"
-    >
-      {action} →
-    </button>
-  </div>
-);
-
-const SkeletonList = ({ count = 4 }) => (
-  <div className="space-y-3 animate-pulse">
-    {[...Array(count)].map((_, i) => (
-      <div key={i} className="bg-white rounded-2xl border p-4 space-y-2">
-        <div className="h-4 bg-gray-200 rounded w-40" />
-        <div className="h-3 bg-gray-200 rounded w-64" />
-      </div>
-    ))}
-  </div>
-);
 
 export default HistoryPage;
