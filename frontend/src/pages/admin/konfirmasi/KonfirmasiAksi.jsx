@@ -1,59 +1,107 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import api from "@/lib/axios";
 
 import ActionCard from "@/components/admin/konfirmasi/ActionCard";
+import ActionDetailModal from "@/components/admin/konfirmasi/ActionDetailModal";
 import SkeletonCards from "@/components/admin/konfirmasi/SkeletonCards";
+
+// ─── Interval auto-refresh (ms) ──────────────────────────────
+const REFRESH_INTERVAL = 15_000; // 15 detik
 
 const KonfirmasiAksi = () => {
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  
-  // State untuk Modal
+
+  // Auto-refresh state
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [countdown, setCountdown] = useState(REFRESH_INTERVAL / 1000);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const intervalRef = useRef(null);
+  const countdownRef = useRef(null);
+
+  // Modal konfirmasi (approve/reject)
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, actionId: null });
   const [rejectReason, setRejectReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const fetchActions = useCallback(async () => {
+  // Modal detail aksi
+  const [detailAction, setDetailAction] = useState(null);
+
+  // ─── Fetch data ──────────────────────────────────────────
+  const fetchActions = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
+      else setIsRefreshing(true);
+
       setError("");
       const { data } = await api.get("/actions/pending");
 
       if (Array.isArray(data)) setActions(data);
       else if (Array.isArray(data.actions)) setActions(data.actions);
       else setActions([]);
+
+      setLastRefreshed(new Date());
     } catch (err) {
-      if (err.response?.status === 401) {
-        setError("Silakan login terlebih dahulu");
-      } else if (err.response?.status === 403) {
-        setError("Akses admin ditolak");
-      } else {
-        setError("Gagal mengambil data aksi");
+      // 401 sudah ditangani interceptor (auto-refresh / force logout)
+      // hanya tampilkan error jika bukan silent refresh
+      if (!silent) {
+        if (err.response?.status === 403) setError("Akses ditolak — halaman ini khusus admin.");
+        else if (err.response?.status >= 500) setError("Server error, coba beberapa saat lagi.");
+        else if (err.code === "ERR_NETWORK") setError("Tidak dapat terhubung ke server.");
+        else if (err.response?.status !== 401) setError("Gagal mengambil data aksi.");
+        // 401 → diam saja, interceptor sudah redirect ke /login
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      else setIsRefreshing(false);
     }
+  }, []);
+
+  // ─── Auto-refresh setup ───────────────────────────────────
+  const resetCountdown = useCallback(() => {
+    setCountdown(REFRESH_INTERVAL / 1000);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => (c <= 1 ? REFRESH_INTERVAL / 1000 : c - 1));
+    }, 1000);
   }, []);
 
   useEffect(() => {
     fetchActions();
-  }, [fetchActions]);
 
-  // Fungsi untuk membuka modal
-  const openModal = (type, actionId) => {
-    setModalConfig({ isOpen: true, type, actionId });
-    setRejectReason(""); // Reset alasan tiap kali modal dibuka
+    // Setup auto-refresh interval
+    intervalRef.current = setInterval(() => {
+      fetchActions(true); // silent refresh
+      resetCountdown();
+    }, REFRESH_INTERVAL);
+
+    resetCountdown();
+
+    return () => {
+      clearInterval(intervalRef.current);
+      clearInterval(countdownRef.current);
+    };
+  }, [fetchActions, resetCountdown]);
+
+  // Manual refresh
+  const handleManualRefresh = () => {
+    fetchActions(true);
+    resetCountdown();
   };
 
-  // Fungsi untuk menutup modal
+  // ─── Modal konfirmasi ─────────────────────────────────────
+  const openModal = (type, actionId) => {
+    setModalConfig({ isOpen: true, type, actionId });
+    setRejectReason("");
+  };
+
   const closeModal = () => {
-    if (isProcessing) return; // Cegah tutup saat loading
+    if (isProcessing) return;
     setModalConfig({ isOpen: false, type: null, actionId: null });
     setRejectReason("");
   };
 
-  // Eksekusi API Berdasarkan Tipe Modal
   const handleProcessAction = async () => {
     const { type, actionId } = modalConfig;
 
@@ -64,15 +112,19 @@ const KonfirmasiAksi = () => {
 
     try {
       setIsProcessing(true);
-      
-      const payload = type === "approve" 
-        ? { status: "approved" } 
-        : { status: "rejected", rejection_reason: rejectReason.trim() };
+      const payload =
+        type === "approve"
+          ? { status: "approved" }
+          : { status: "rejected", rejection_reason: rejectReason.trim() };
 
       await api.patch(`/actions/${actionId}/verify`, payload);
-      
-      // Hapus item dari list setelah berhasil
+
+      // Hapus dari list setelah berhasil
       setActions((prev) => prev.filter((a) => a.id !== actionId));
+
+      // Tutup juga modal detail jika sedang terbuka untuk action yang sama
+      if (detailAction?.id === actionId) setDetailAction(null);
+
       closeModal();
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -82,9 +134,16 @@ const KonfirmasiAksi = () => {
     }
   };
 
+  // ─── Buka modal detail dari dalam modal konfirmasi ────────
+  const openConfirmFromDetail = (type) => {
+    if (!detailAction) return;
+    openModal(type, detailAction.id);
+  };
+
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
-      {/* HEADER */}
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+
+      {/* ─── HEADER ─────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -94,17 +153,51 @@ const KonfirmasiAksi = () => {
             Tinjau dan verifikasi aktivitas pengguna yang menunggu persetujuan.
           </p>
         </div>
-        
-        {/* Badge Info */}
-        {!loading && (
-          <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full border border-emerald-100 font-semibold text-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {actions.length} Menunggu Konfirmasi
+
+        {/* Kanan: badge count + auto-refresh indicator */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {!loading && (
+            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full border border-emerald-100 font-semibold text-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {actions.length} Menunggu
+            </div>
+          )}
+
+          {/* Auto-refresh info */}
+          <div className="inline-flex items-center gap-2 bg-slate-50 text-slate-500 px-4 py-2 rounded-full border border-slate-100 text-sm font-medium">
+            {isRefreshing ? (
+              <>
+                <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Memperbarui...
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                Refresh dalam {countdown}dtk
+              </>
+            )}
+            <button
+              onClick={handleManualRefresh}
+              className="ml-1 text-slate-400 hover:text-slate-700 transition-colors"
+              title="Refresh sekarang"
+            >
+              ↺
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* ERROR BANNER */}
+      {/* Timestamp terakhir refresh */}
+      {lastRefreshed && (
+        <p className="text-[11px] text-gray-400 -mt-3">
+          Terakhir diperbarui: {lastRefreshed.toLocaleTimeString("id-ID")}
+        </p>
+      )}
+
+      {/* ─── ERROR ──────────────────────────────────────── */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-xl flex items-start gap-3">
           <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -114,7 +207,7 @@ const KonfirmasiAksi = () => {
         </div>
       )}
 
-      {/* CONTENT LIST */}
+      {/* ─── CONTENT ─────────────────────────────────────── */}
       {loading ? (
         <div className="space-y-4">
           <SkeletonCards count={5} />
@@ -127,56 +220,83 @@ const KonfirmasiAksi = () => {
             </svg>
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-1">Semua aksi sudah tertinjau</h3>
-          <p className="text-sm text-gray-500">Tidak ada aksi pengguna yang menunggu konfirmasi saat ini.</p>
+          <p className="text-sm text-gray-500">
+            Tidak ada aksi yang menunggu konfirmasi saat ini.
+          </p>
+          <button
+            onClick={handleManualRefresh}
+            className="mt-4 text-sm text-emerald-600 font-semibold hover:underline"
+          >
+            ↺ Cek lagi sekarang
+          </button>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {actions.map((action) => (
             <ActionCard
               key={action.id}
               action={action}
               onConfirm={() => openModal("approve", action.id)}
               onReject={() => openModal("reject", action.id)}
-              isLoading={false} // Loading per item dikontrol oleh skeleton, action processing pindah ke modal
+              onViewDetail={(a) => setDetailAction(a)}
+              isLoading={isProcessing && modalConfig.actionId === action.id}
             />
           ))}
         </div>
       )}
 
-      {/* MODAL OVERLAY */}
+      {/* ─── MODAL DETAIL ─────────────────────────────── */}
+      {detailAction && (
+        <ActionDetailModal
+          action={detailAction}
+          onClose={() => setDetailAction(null)}
+          onConfirm={() => { openConfirmFromDetail("approve"); }}
+          onReject={() => { openConfirmFromDetail("reject"); }}
+        />
+      )}
+
+      {/* ─── MODAL KONFIRMASI/TOLAK ────────────────────── */}
       {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop Blur */}
-          <div 
-            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
             onClick={closeModal}
           />
-          
-          {/* Modal Content */}
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 fade-in duration-200">
-            {/* Header Modal */}
-            <div className={`p-6 border-b border-gray-100 flex items-center gap-4 ${modalConfig.type === 'approve' ? 'bg-emerald-50/50' : 'bg-red-50/50'}`}>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${modalConfig.type === 'approve' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                {modalConfig.type === 'approve' ? (
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className={`p-6 border-b border-gray-100 flex items-center gap-4 ${
+              modalConfig.type === "approve" ? "bg-emerald-50/50" : "bg-red-50/50"
+            }`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+                modalConfig.type === "approve"
+                  ? "bg-emerald-100 text-emerald-600"
+                  : "bg-red-100 text-red-600"
+              }`}>
+                {modalConfig.type === "approve" ? (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
                 ) : (
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 )}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900">
-                  {modalConfig.type === 'approve' ? "Setujui Aksi?" : "Tolak Aksi?"}
+                  {modalConfig.type === "approve" ? "Setujui Aksi?" : "Tolak Aksi?"}
                 </h3>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {modalConfig.type === 'approve' 
-                    ? "Pastikan bukti yang diunggah valid." 
+                  {modalConfig.type === "approve"
+                    ? "Pastikan bukti yang diunggah valid dan sesuai."
                     : "Aksi yang ditolak tidak akan mendapatkan poin."}
                 </p>
               </div>
             </div>
 
-            {/* Body Modal (Input Alasan Penolakan) */}
-            {modalConfig.type === 'reject' && (
+            {/* Body: input alasan tolak */}
+            {modalConfig.type === "reject" && (
               <div className="p-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Alasan Penolakan <span className="text-red-500">*</span>
@@ -192,7 +312,7 @@ const KonfirmasiAksi = () => {
               </div>
             )}
 
-            {/* Footer Modal (Buttons) */}
+            {/* Footer */}
             <div className="p-6 pt-2 flex gap-3">
               <button
                 type="button"
@@ -206,26 +326,26 @@ const KonfirmasiAksi = () => {
                 type="button"
                 onClick={handleProcessAction}
                 disabled={isProcessing}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed
-                  ${modalConfig.type === 'approve' 
-                    ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-500/30' 
-                    : 'bg-red-600 hover:bg-red-700 hover:shadow-red-500/30'
-                  }`}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 ${
+                  modalConfig.type === "approve"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
               >
                 {isProcessing ? (
                   <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
                     Memproses...
                   </>
-                ) : (
-                  modalConfig.type === 'approve' ? "Ya, Setujui" : "Tolak Aksi"
-                )}
+                ) : modalConfig.type === "approve" ? "Ya, Setujui" : "Tolak Aksi"}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

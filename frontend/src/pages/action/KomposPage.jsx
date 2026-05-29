@@ -90,7 +90,7 @@ const KomposPage = () => {
       icon={Leaf}
       iconBg="bg-green-100"
       iconColor="text-green-600"
-      accentColor="green"
+      accentColor="emerald"
       title="Buat Kompos"
       subtitle={`${wasteLabel} bisa jadi pupuk kaya nutrisi — bukan sekadar sampah.`}
       guideTitle="Cara Membuat Kompos di Rumah"

@@ -9,44 +9,56 @@ import {
   BarChart3,
   Users,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../../lib/axios.js";
 import { useAuth } from "@/context/AuthContext.jsx";
 
 function AdminSidebar() {
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingActionCount, setPendingActionCount] = useState(0);
+  const [pendingMitraCount,  setPendingMitraCount]  = useState(0);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  const fetchPendingCount = async () => {
+  const fetchCounts = useCallback(async () => {
     try {
-      const res = await api.get("/actions/pending/count");
-      setPendingCount(res.data.count || 0);
+      const [actionRes, mitraRes] = await Promise.allSettled([
+        api.get("/actions/pending/count"),
+        api.get("/admin/mitra/pending/count"),
+      ]);
+
+      if (actionRes.status === "fulfilled") {
+        setPendingActionCount(actionRes.value.data.count || 0);
+      }
+      if (mitraRes.status === "fulfilled") {
+        setPendingMitraCount(mitraRes.value.data.count || 0);
+      }
     } catch (err) {
       console.error("Gagal ambil pending count:", err);
     }
-  };
-
-  useEffect(() => {
-    fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 10000);
-    return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchCounts]);
+
   const menu = [
-    { label: "Dashboard",        path: "/admin/dashboard",       icon: BarChart3 },
-    { label: "Persetujuan Aksi", path: "/admin/konfirmasi",      icon: CheckCircle, badge: pendingCount },
-    { label: "Data Pengguna",    path: "/admin/user",            icon: Users },
-    { label: "Data Mitra",       path: "/admin/partners",        icon: Handshake },
-    { label: "Data Sampah",      path: "/admin/waste-data",      icon: Database },
-    { label: "Monitoring AI",    path: "/admin/ai-monitoring",   icon: Brain },
-    { label: "Pelacakan Aksi",   path: "/admin/action-tracking", icon: ClipboardList },
-    { label: "Konten",           path: "/admin/content",         icon: FileText },
+    { label: "Dashboard",        path: "/admin/dashboard",        icon: BarChart3                              },
+    { label: "Persetujuan Aksi", path: "/admin/konfirmasi",       icon: CheckCircle, badge: pendingActionCount },
+    { label: "Verifikasi Mitra", path: "/admin/verifikasi-mitra", icon: ShieldCheck, badge: pendingMitraCount  },
+    { label: "Data Pengguna",    path: "/admin/user",             icon: Users                                  },
+    { label: "Data Mitra",       path: "/admin/partners",         icon: Handshake                              },
+    { label: "Data Sampah",      path: "/admin/waste-data",       icon: Database                               },
+    { label: "Monitoring AI",    path: "/admin/ai-monitoring",    icon: Brain                                  },
+    { label: "Pelacakan Aksi",   path: "/admin/action-tracking",  icon: ClipboardList                         },
+    { label: "Konten",           path: "/admin/content",          icon: FileText                               },
   ];
 
   const handleLogout = () => {
-    logout();           // hapus sessionStorage + reset AuthContext state
+    logout();
     navigate("/login");
   };
 

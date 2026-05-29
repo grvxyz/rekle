@@ -3,6 +3,13 @@
  *
  * Menampilkan satu challenge sebagai card ringkas.
  * Klik "Lihat Detail" → navigate ke /challenge/:id
+ *
+ * FIX vs backend:
+ * - challenge_type dari ContentResponse: "scan" | "action" | "points"  ✓ (sudah sesuai)
+ * - status dari ContentResponse: "draft" | "active" | "inactive" — tambah "draft"
+ * - progress pakai field `current` yang di-inject oleh parent (ChallengePage)
+ * - reward_points default 0 sesuai ContentBase ✓
+ * - target nullable sesuai ContentBase ✓
  */
 
 import { useNavigate } from "react-router-dom";
@@ -13,10 +20,13 @@ const TYPE_META = {
   points: { label: "Kumpul Poin", icon: "⭐", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
 };
 
+// FIX: tambah "draft" sesuai default status di model Content
 const STATUS_META = {
-  active:    { label: "Aktif",     color: "bg-emerald-100 text-emerald-700" },
-  inactive:  { label: "Nonaktif",  color: "bg-gray-100 text-gray-500" },
-  completed: { label: "Selesai",   color: "bg-blue-100 text-blue-700" },
+  active:   { label: "Aktif",    color: "bg-emerald-100 text-emerald-700" },
+  inactive: { label: "Nonaktif", color: "bg-gray-100 text-gray-500" },
+  draft:    { label: "Draft",    color: "bg-orange-100 text-orange-600" },
+  // "completed" bukan status dari backend — dihapus, karena status enum: draft|active|inactive
+  // "selesai" ditentukan dari progress >= target, bukan dari field status
 };
 
 export default function ChallengeCard({ challenge }) {
@@ -25,10 +35,14 @@ export default function ChallengeCard({ challenge }) {
   const typeMeta   = TYPE_META[challenge.challenge_type]   ?? { label: challenge.challenge_type ?? "Challenge", icon: "🏆", color: "bg-purple-50 text-purple-700 border-purple-200" };
   const statusMeta = STATUS_META[challenge.status] ?? { label: challenge.status, color: "bg-gray-100 text-gray-500" };
 
-  const progress   = challenge.current ?? 0;
-  const target     = challenge.target  ?? 1;
-  const pct        = Math.min(100, Math.round((progress / target) * 100));
-  const isDone     = challenge.completed || pct >= 100;
+  // FIX: `current` di-inject oleh ChallengePage via calculateChallengeProgress
+  // field ini tidak ada di ContentResponse — parent wajib inject sebelum passing ke sini
+  const progress = challenge.current ?? 0;
+  const target   = challenge.target  ?? null; // nullable sesuai ContentBase
+  const pct      = target ? Math.min(100, Math.round((progress / target) * 100)) : null;
+
+  // FIX: `completed` juga di-inject oleh parent (bukan field dari backend)
+  const isDone = challenge.completed || (pct !== null && pct >= 100);
 
   return (
     <div
@@ -58,21 +72,22 @@ export default function ChallengeCard({ challenge }) {
                 {statusMeta.label}
               </span>
             </div>
+            {/* FIX: `title` wajib ada (nullable=false di ContentBase) */}
             <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
               {challenge.title}
             </h3>
           </div>
         </div>
 
-        {/* Description */}
+        {/* Description — nullable sesuai ContentBase */}
         {challenge.description && (
           <p className="text-xs text-gray-500 line-clamp-2 mb-3 ml-9">
             {challenge.description}
           </p>
         )}
 
-        {/* Progress bar */}
-        {challenge.target && (
+        {/* Progress bar — hanya render jika target tidak null */}
+        {target !== null && (
           <div className="ml-9 mb-3">
             <div className="flex justify-between text-xs text-gray-500 mb-1">
               <span>Progress</span>
@@ -81,7 +96,7 @@ export default function ChallengeCard({ challenge }) {
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${isDone ? "bg-emerald-500" : "bg-green-400"}`}
-                style={{ width: `${pct}%` }}
+                style={{ width: `${pct ?? 0}%` }}
               />
             </div>
           </div>
@@ -89,6 +104,7 @@ export default function ChallengeCard({ challenge }) {
 
         {/* Footer */}
         <div className="ml-9 flex items-center justify-between">
+          {/* FIX: reward_points default 0 sesuai ContentBase — tidak akan undefined */}
           <div className="flex items-center gap-1 text-amber-600">
             <span className="text-sm">⭐</span>
             <span className="text-sm font-bold">{challenge.reward_points ?? 0}</span>

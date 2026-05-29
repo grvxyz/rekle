@@ -28,7 +28,7 @@ const CONTENT_TYPES = [
   { value: "reward",    label: "Rewards" },
 ];
 
-const STATUS_OPTIONS = ["published", "active", "draft", "inactive"];
+const STATUS_OPTIONS = ["active", "draft", "inactive"];
 
 const CHALLENGE_TYPES = ["scan", "action", "points"];
 
@@ -54,7 +54,6 @@ const TYPE_CONFIG = {
 };
 
 const STATUS_CONFIG = {
-  published: { label: "Published", cls: "text-green-600" },
   active:    { label: "Active",    cls: "text-green-600" },
   draft:     { label: "Draft",     cls: "text-gray-500"  },
   inactive:  { label: "Inactive",  cls: "text-gray-400"  },

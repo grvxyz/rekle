@@ -21,6 +21,8 @@ import { useNavigate } from "react-router-dom";
 
 import api from "@/lib/axios";
 
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
 import dayjs from "dayjs";
 
 // ======================================================
@@ -103,7 +105,7 @@ const HistoryPage = () => {
             );
 
           setActivities(
-            response.data || []
+            Array.isArray(response.data) ? response.data : (response.data?.items ?? [])
           );
 
         } catch (err) {
@@ -563,7 +565,7 @@ const HistoryPage = () => {
               {(selectedActivity.image_path ||
                 selectedActivity.prediction?.image_path) && (
                 <img
-                  src={`http://localhost:8000/${
+                  src={`${BASE_URL}/${
                     selectedActivity.image_path ||
                     selectedActivity.prediction?.image_path
                   }`}
@@ -828,7 +830,7 @@ const HistoryPage = () => {
                 </p>
               </div>
               <img
-                src={`http://localhost:8000/${
+                src={`${BASE_URL}/${
                   selectedActivity.proof_image_path ||
                   selectedActivity.action?.proof_image_path
                 }`}

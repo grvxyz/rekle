@@ -13,6 +13,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 
+// ← base URL dari env, tidak hardcode localhost
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
 // Menerima props dari ScanPage — BUKAN dari location.state
 const ScanResult = ({ image, result, resetScan }) => {
   const navigate = useNavigate();
@@ -43,15 +46,22 @@ const ScanResult = ({ image, result, resetScan }) => {
   const handleLanjutAksi = () => {
     navigate("/action", {
       state: {
-        result:        result?.category || result?.result || null,
+        result:        result?.result || null,   // ← fix: hapus result?.category yang salah
         prediction_id: result?.prediction_id ?? null,
       },
     });
   };
 
-  // Ide upcycling dari API
+  // Ide upcycling dari API — sudah ada di response sejak kita fix scan.py
   const ideas = result?.upcycle_ideas || [];
   const visibleIdeas = showAllIdeas ? ideas : ideas.slice(0, 4);
+
+  // Bangun image URL dari base URL env
+  const imageUrl = image
+    ? image
+    : result?.image_path
+    ? `${BASE_URL}/${result.image_path}`
+    : null;
 
   return (
     <div className="space-y-8 mt-4">
@@ -69,10 +79,10 @@ const ScanResult = ({ image, result, resetScan }) => {
       <div className="grid md:grid-cols-2 gap-6">
 
         {/* IMAGE */}
-        {(image || result?.image_path) && (
+        {imageUrl && (
           <div className="bg-white border rounded-3xl overflow-hidden shadow-sm">
             <img
-              src={image || `http://127.0.0.1:8000/${result.image_path}`}
+              src={imageUrl}
               alt="Result"
               className="w-full h-105 object-cover"
             />

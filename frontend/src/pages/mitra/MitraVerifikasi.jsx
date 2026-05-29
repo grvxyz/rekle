@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { CheckCircle, XCircle, Eye, RefreshCw } from "lucide-react";
 import api from "@/lib/axios";
 
-// ─── Constants ─────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────
 const ACTION_TYPE_LABEL = {
   kompos:      "Kompos",
   bank_sampah: "Bank Sampah",
@@ -12,9 +12,20 @@ const ACTION_TYPE_LABEL = {
   khusus:      "Penanganan Khusus",
 };
 
-// ─── Proof Modal ───────────────────────────────────────────
+/**
+ * Konversi weight_gram (integer dari backend) → tampilan kg.
+ * Contoh: 1500 → "1.5 kg" | 500 → "500 g" | null → null
+ */
+const formatWeight = (gram) => {
+  if (!gram) return null;
+  if (gram >= 1000) return `${(gram / 1000).toFixed(gram % 1000 === 0 ? 0 : 1)} kg`;
+  return `${gram} g`;
+};
+
+// ─── Proof Modal ────────────────────────────────────────────
 const ProofModal = ({ action, onClose, onVerify, verifyLoading }) => {
   const proofUrl = action.proof_url || action.proof_image_path;
+  const weightDisplay = formatWeight(action.weight_gram);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -41,10 +52,10 @@ const ProofModal = ({ action, onClose, onVerify, verifyLoading }) => {
                 <span className="text-sm font-semibold text-gray-900 capitalize">{action.route}</span>
               </div>
             )}
-            {action.weight_kg && (
+            {weightDisplay && (
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500 uppercase tracking-wide font-medium">Berat</span>
-                <span className="text-sm font-semibold text-gray-900">{action.weight_kg} kg</span>
+                <span className="text-sm font-semibold text-gray-900">{weightDisplay}</span>
               </div>
             )}
             <div className="flex items-center justify-between">
@@ -107,9 +118,10 @@ const ProofModal = ({ action, onClose, onVerify, verifyLoading }) => {
   );
 };
 
-// ─── Action Card ───────────────────────────────────────────
+// ─── Action Card ────────────────────────────────────────────
 const ActionCard = ({ action, onVerify, verifyLoading, onViewDetail }) => {
   const hasProof = Boolean(action.proof_url || action.proof_image_path);
+  const weightDisplay = formatWeight(action.weight_gram);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-4">
@@ -132,10 +144,10 @@ const ActionCard = ({ action, onVerify, verifyLoading, onViewDetail }) => {
 
       {/* Detail */}
       <div className="flex gap-4 text-sm text-gray-600">
-        {action.weight_kg && (
+        {weightDisplay && (
           <div className="flex items-center gap-1">
             <span>⚖️</span>
-            <span>{action.weight_kg} kg</span>
+            <span>{weightDisplay}</span>
           </div>
         )}
         <div className="flex items-center gap-1">
@@ -148,7 +160,6 @@ const ActionCard = ({ action, onVerify, verifyLoading, onViewDetail }) => {
               : "-"}
           </span>
         </div>
-        {/* FIX: icon berbeda untuk ada/tidak ada foto */}
         <div className="flex items-center gap-1">
           <span>{hasProof ? "📷" : "🚫"}</span>
           <span className={hasProof ? "text-green-600" : "text-gray-400"}>
@@ -187,7 +198,7 @@ const ActionCard = ({ action, onVerify, verifyLoading, onViewDetail }) => {
   );
 };
 
-// ─── Skeleton ──────────────────────────────────────────────
+// ─── Skeleton ───────────────────────────────────────────────
 const SkeletonCards = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
     {[...Array(6)].map((_, i) => (
@@ -210,7 +221,7 @@ const SkeletonCards = () => (
   </div>
 );
 
-// ─── Main Page ─────────────────────────────────────────────
+// ─── Main Page ──────────────────────────────────────────────
 const MitraVerifikasi = () => {
   const [actions,        setActions]        = useState([]);
   const [loading,        setLoading]        = useState(true);
@@ -228,7 +239,6 @@ const MitraVerifikasi = () => {
     try {
       setLoading(true);
       setError("");
-      // Gunakan endpoint mitra-owner, bukan /actions/pending (itu khusus superuser)
       const { data } = await api.get("/mitra/mine/actions/pending");
       const list = Array.isArray(data) ? data : [];
       setActions(list);
@@ -250,7 +260,6 @@ const MitraVerifikasi = () => {
 
     try {
       setVerifyLoading(actionId);
-      // Gunakan endpoint mitra-owner untuk verifikasi
       await api.patch(`/mitra/mine/actions/${actionId}/verify`, { status: newStatus });
       setActions((prev) => prev.filter((a) => a.id !== actionId));
       setSelectedAction(null);
@@ -331,7 +340,6 @@ const MitraVerifikasi = () => {
         </div>
       )}
 
-      {/* Proof Modal */}
       {selectedAction && (
         <ProofModal
           action={selectedAction}

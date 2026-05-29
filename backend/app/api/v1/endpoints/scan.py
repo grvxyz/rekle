@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.ml.classifier import predict
 from app.ml.preprocessor import validate_image
 from app.ml.recommendation import get_recommendation
+from app.ml.upcycle_ideas import get_upcycle_ideas  # ← ditambahkan
 from app.models.prediction import Prediction
 from app.models.user import User
 from app.schemas.prediction_schema import (
@@ -17,6 +18,7 @@ from app.schemas.prediction_schema import (
     ScanHistoryList,
     ScanResult,
     Top2Prediction,
+    UpcycleIdea,  # ← ditambahkan
 )
 from app.api.v1.deps import get_current_user
 
@@ -41,7 +43,7 @@ async def upload_and_scan(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Upload gambar sampah -> klasifikasi AI -> kembalikan hasil + rekomendasi.
+    Upload gambar sampah -> klasifikasi AI -> kembalikan hasil + rekomendasi + ide upcycling.
 
     Poin scan (10) langsung diberikan saat scan berhasil.
     Poin aksi (50) dan saldo diberikan setelah user menyelesaikan
@@ -73,7 +75,11 @@ async def upload_and_scan(
     # 4. Rekomendasi aksi
     recommendation = get_recommendation(label) if is_confident else None
 
-    # 5. Simpan ke DB
+    # 5. Ide upcycling berdasarkan label klasifikasi
+    raw_ideas = get_upcycle_ideas(label)
+    upcycle_ideas = [UpcycleIdea(**idea) for idea in raw_ideas]
+
+    # 6. Simpan ke DB
     prediction = Prediction(
         user_id=current_user.id,
         result=label,
@@ -85,7 +91,7 @@ async def upload_and_scan(
     )
     db.add(prediction)
 
-    # 6. Poin scan langsung diberikan
+    # 7. Poin scan langsung diberikan
     current_user.scan_count = (current_user.scan_count or 0) + 1
     current_user.total_points = (current_user.total_points or 0) + settings.points_per_scan
 
@@ -102,6 +108,7 @@ async def upload_and_scan(
         image_path=image_path,
         top2=[Top2Prediction(**t) for t in top2],
         points_earned=settings.points_per_scan,
+        upcycle_ideas=upcycle_ideas,  # ← ditambahkan
     )
 
 
@@ -150,6 +157,9 @@ def get_scan_detail(
             detail="Scan tidak ditemukan",
         )
 
+    raw_ideas = get_upcycle_ideas(prediction.result)
+    upcycle_ideas = [UpcycleIdea(**idea) for idea in raw_ideas]
+
     return ScanResult(
         prediction_id=prediction.id,
         result=prediction.result,
@@ -160,4 +170,5 @@ def get_scan_detail(
         image_path=prediction.image_path,
         top2=[],
         points_earned=0,
+        upcycle_ideas=upcycle_ideas,  # ← ditambahkan
     )

@@ -22,11 +22,11 @@ import LoginPage    from "./pages/auth/login.jsx";
 import RegisterPage from "./pages/auth/register.jsx";
 import LandingPage  from "./pages/landing/LandingPage.jsx";
 
-import ScanPage       from "./pages/scan/ScanPage";
-import UserDashboard  from "./pages/dashboard/Dashboard.jsx";
-import Profile        from "./pages/profile/Profile.jsx";
-import HistoryPage    from "./pages/history/HistoryPage.jsx";
-import ChallengePage  from "./pages/challenge/ChallengePage.jsx";
+import ScanPage        from "./pages/scan/ScanPage";
+import UserDashboard   from "./pages/dashboard/Dashboard.jsx";
+import Profile         from "./pages/profile/Profile.jsx";
+import HistoryPage     from "./pages/history/HistoryPage.jsx";
+import ChallengePage   from "./pages/challenge/ChallengePage.jsx";
 import ChallengeDetail from "./pages/challenge/ChallengeDetail.jsx";
 
 // ── Action pages ────────────────────────────────────────────
@@ -41,6 +41,7 @@ import KhususPage     from "./pages/action/KhususPage";
 // ── Admin pages ─────────────────────────────────────────────
 import AdminDashboard    from "./pages/admin/dashboard/Dashboard.jsx";
 import KonfirmasiAksi    from "./pages/admin/konfirmasi/KonfirmasiAksi.jsx";
+import VerifikasiMitra   from "./pages/admin/verifikasi-mitra/VerifikasiMitra.jsx"; // ← ditambahkan
 import UserManagement    from "./pages/admin/user/UserManagement.jsx";
 import DataMitra         from "./pages/admin/mitra/DataMitra.jsx";
 import DataSampah        from "./pages/admin/datasampah/DataSampah.jsx";
@@ -169,14 +170,15 @@ function Layout() {
           <Route path="/action/khusus"      element={<ProtectedRoute><KhususPage /></ProtectedRoute>} />
 
           {/* ── ADMIN (protected) ───────────────────── */}
-          <Route path="/admin/dashboard"      element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/konfirmasi"     element={<AdminRoute><AdminLayout><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/user"           element={<AdminRoute><AdminLayout><UserManagement /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/partners"       element={<AdminRoute><AdminLayout><DataMitra /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/waste-data"     element={<AdminRoute><AdminLayout><DataSampah /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/ai-monitoring"  element={<AdminRoute><AdminLayout><AIMonitoring /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/action-tracking" element={<AdminRoute><AdminLayout><ActionTracking /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/content"        element={<AdminRoute><AdminLayout><ContentManagement /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/dashboard"        element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/konfirmasi"        element={<AdminRoute><AdminLayout><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/verifikasi-mitra"  element={<AdminRoute><AdminLayout><VerifikasiMitra /></AdminLayout></AdminRoute>} /> {/* ← ditambahkan */}
+          <Route path="/admin/user"              element={<AdminRoute><AdminLayout><UserManagement /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/partners"          element={<AdminRoute><AdminLayout><DataMitra /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/waste-data"        element={<AdminRoute><AdminLayout><DataSampah /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/ai-monitoring"     element={<AdminRoute><AdminLayout><AIMonitoring /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/action-tracking"   element={<AdminRoute><AdminLayout><ActionTracking /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/content"           element={<AdminRoute><AdminLayout><ContentManagement /></AdminLayout></AdminRoute>} />
 
           {/* ── MITRA ───────────────────────────────── */}
           <Route path="/mitra/login"      element={<MitraLogin />} />

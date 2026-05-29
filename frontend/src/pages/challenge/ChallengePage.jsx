@@ -1,12 +1,11 @@
+
 import { useEffect, useRef, useState } from "react";
 
 import ChallengeHero    from "../../components/challenge/ChallengeHero.jsx";
 import ChallengeSummary from "../../components/challenge/ChallengeSummary.jsx";
 import ChallengeCard    from "../../components/challenge/ChallengeCard.jsx";
 import LeaderboardCard  from "../../components/challenge/LeaderboardCard.jsx";
-import {
-  calculateChallengeProgress,
-} from "@/utils/challengeProgress";
+import { calculateChallengeProgress } from "@/utils/challengeProgress";
 import api from "../../lib/axios.js";
 
 async function getAnime() {
@@ -25,142 +24,57 @@ export default function ChallengePage() {
   const listRef    = useRef(null);
   const boardRef   = useRef(null);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // GET /api/v1/users/me → UserResponse
         const { data: userData } = await api.get("/users/me");
         setUser(userData);
 
-        // Hanya ambil challenge yang active
-// ======================================
-// FETCH ACTIVE CHALLENGES
-// ======================================
+        // GET /api/v1/content/?type=challenge&status=active → ContentResponse[]
+        const response = await api.get("/content?type=challenge&status=active");
 
-const response =
-  await api.get(
-    "/content?type=challenge&status=active"
-  );
+        // FIX: normalise — bisa array langsung atau { items, data }
+        const challengeData = Array.isArray(response.data)
+          ? response.data
+          : response.data?.items ?? response.data?.data ?? [];
 
-const challengeData =
-  Array.isArray(response.data)
-    ? response.data
-    : response.data.items ||
-      response.data.data ||
-      [];
+        // GET /api/v1/actions/activity — riwayat aktivitas untuk progress
+        const { data: rawActivity } = await api.get("/actions/activity?limit=200");
 
-// ======================================
-// FETCH USER ACTIVITY
-// ======================================
+        // FIX: normalise activity response
+        const activityData = Array.isArray(rawActivity)
+          ? rawActivity
+          : rawActivity?.items ?? [];
 
-const {
-  data: activityData,
-} = await api.get(
-  "/actions/activity?limit=200"
-);
+        // Enrich challenge dengan progress dari activity
+        const enrichedChallenges = challengeData.map((challenge) => {
+          const current = calculateChallengeProgress(activityData, challenge);
+          const target  = challenge.target ?? 1;
+          return {
+            ...challenge,
+            current,
+            completed: current >= target,
+          };
+        });
 
-// ======================================
-// COUNT ACTIVITY
-// ======================================
+        setChallenges(enrichedChallenges);
 
-const scanItems =
-  activityData.filter(
-    (item) =>
-      item.type === "scan"
-  );
+        // FIX: UserResponse menggunakan `total_points` bukan `reward_points`
+        // (reward_points tidak ada di UserResponse schema)
+        const leaderboardData = [
+          {
+            id: userData.id,
+            name:
+              userData.full_name ??
+              userData.email ??
+              "Kamu",
+            points: userData.total_points ?? 0, // FIX: field yang benar dari UserResponse
+            isMe: true,
+          },
+        ];
 
-// hanya scan unik berdasarkan title + created_at
-const uniqueScans =
-  Array.from(
-    new Map(
-      scanItems.map(
-        (item) => [
-          `${item.title}_${item.created_at}`,
-          item,
-        ]
-      )
-    ).values()
-  );
-
-const scanCount =
-  uniqueScans.length;
-
-const actionItems =
-  activityData.filter(
-    (item) =>
-      item.type === "action"
-  );
-
-const uniqueActions =
-  Array.from(
-    new Map(
-      actionItems.map(
-        (item) => [
-          `${item.title}_${item.created_at}`,
-          item,
-        ]
-      )
-    ).values()
-  );
-
-const actionCount =
-  uniqueActions.length;
-
-// ======================================
-// ENRICH CHALLENGE
-// ======================================
-const enrichedChallenges =
-  challengeData.map(
-    (challenge) => {
-
-      const current =
-        calculateChallengeProgress(
-          activityData,
-          challenge
-        );
-
-      const target =
-        challenge.target || 1;
-
-      return {
-        ...challenge,
-
-        current,
-
-        completed:
-          current >= target,
-      };
-    }
-  );
-
-setChallenges(
-  enrichedChallenges
-);
-// ======================================
-// USER LEADERBOARD
-// ======================================
-
-const leaderboardData = [
-  {
-    id: userData.id,
-    name:
-      userData.full_name ||
-      userData.username ||
-      userData.email ||
-      "Kamu",
-
-    points:
-      userData.reward_points ||
-      userData.total_points ||
-      0,
-
-    isMe: true,
-  },
-];
-
-setLeaderboard(
-  leaderboardData
-);
+        setLeaderboard(leaderboardData);
 
       } catch (err) {
         console.error("Challenge fetch error:", err);
@@ -188,7 +102,9 @@ setLeaderboard(
           opacity: [0, 1],
           translateY: [20, 0],
           duration: 400,
-          delay: anime.stagger ? anime.stagger(80, { start: 250 }) : (_el, i) => 250 + i * 80,
+          delay: anime.stagger
+            ? anime.stagger(80, { start: 250 })
+            : (_el, i) => 250 + i * 80,
           easing: "easeOutCubic",
         });
 
@@ -201,7 +117,6 @@ setLeaderboard(
     })();
   }, [loading]);
 
-  // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <p className="text-sm text-gray-400 animate-pulse">Memuat challenge...</p>
@@ -209,7 +124,9 @@ setLeaderboard(
   );
 
   const completedChallenges = challenges.filter((c) => c.completed).length;
-  const totalRewardPoints   = challenges
+  // FIX: hitung total reward_points dari challenge yang sudah selesai
+  // reward_points nullable tapi default 0 di ContentBase
+  const totalRewardPoints = challenges
     .filter((c) => c.completed)
     .reduce((sum, c) => sum + (c.reward_points ?? 0), 0);
 
@@ -232,15 +149,11 @@ setLeaderboard(
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-
           {/* Challenge List */}
           <div ref={listRef} className="lg:col-span-2 space-y-4">
             {challenges.length > 0 ? (
               challenges.map((challenge) => (
-                <ChallengeCard
-                  key={challenge.id}
-                  challenge={challenge}
-                />
+                <ChallengeCard key={challenge.id} challenge={challenge} />
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
@@ -254,8 +167,8 @@ setLeaderboard(
           <div ref={boardRef} style={{ opacity: 0 }}>
             <LeaderboardCard users={leaderboard} />
           </div>
-
         </div>
+
       </div>
     </div>
   );

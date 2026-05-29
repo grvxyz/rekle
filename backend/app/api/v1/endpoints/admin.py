@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import date, datetime, timedelta, timezone
 from pydantic import BaseModel
 
@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.prediction import Prediction
 from app.models.action import Action
 from app.models.mitra import Mitra
+from app.models.point_setting import PointSetting          # ← ditambahkan
 from app.schemas.user_schema import UserResponse
 from app.api.v1.deps import get_current_superuser
 from app.models.content import Content
@@ -75,7 +76,6 @@ def admin_dashboard(
         .all()
     )
 
-    # Mitra pending verifikasi
     pending_mitras = (
         db.query(func.count(Mitra.id))
         .filter(Mitra.status == "pending")
@@ -106,7 +106,6 @@ def list_all_users(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Daftar semua user dengan pagination."""
     return db.query(User).offset(skip).limit(limit).all()
 
 
@@ -149,7 +148,7 @@ def set_superuser(
 
 
 # =========================================================
-# SCANS - LIST SEMUA SCAN
+# SCANS
 # =========================================================
 
 @router.get("/scans", response_model=ScanHistoryList)
@@ -160,7 +159,6 @@ def list_all_scans(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Admin: list semua hasil scan dari seluruh user."""
     query = db.query(Prediction)
 
     if result:
@@ -183,8 +181,8 @@ def list_all_scans(
 # =========================================================
 
 class MitraVerifySchema(BaseModel):
-    status: str                             # "approved" | "rejected"
-    rejection_reason: Optional[str] = None  # wajib jika rejected
+    status: str
+    rejection_reason: Optional[str] = None
 
 
 @router.get("/mitra/pending", response_model=List[MitraResponse])
@@ -194,7 +192,6 @@ def list_pending_mitras(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Admin: list semua mitra yang menunggu verifikasi pendaftaran."""
     return (
         db.query(Mitra)
         .filter(Mitra.status == "pending")
@@ -210,7 +207,6 @@ def count_pending_mitras(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """Admin: jumlah mitra yang menunggu verifikasi."""
     count = (
         db.query(func.count(Mitra.id))
         .filter(Mitra.status == "pending")
@@ -226,12 +222,6 @@ def verify_mitra(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_superuser),
 ):
-    """
-    Admin approve atau reject pendaftaran mitra.
-
-    Jika approved → mitra langsung aktif (is_active = True).
-    Jika rejected → rejection_reason wajib diisi.
-    """
     if payload.status not in ("approved", "rejected"):
         raise HTTPException(status_code=400, detail="status harus 'approved' atau 'rejected'")
 
@@ -249,15 +239,69 @@ def verify_mitra(
     mitra.rejection_reason = payload.rejection_reason
     mitra.verified_by = current_user.id
     mitra.verified_at = datetime.now(timezone.utc)
-
-    if payload.status == "approved":
-        mitra.is_active = True
-    else:
-        mitra.is_active = False
+    mitra.is_active = payload.status == "approved"
 
     db.commit()
     db.refresh(mitra)
     return mitra
+
+
+# =========================================================
+# POINT SETTINGS                                    ← BARU
+# =========================================================
+
+class PointSettingItem(BaseModel):
+    label:   str
+    points:  int
+    balance: int
+
+
+@router.get("/point-settings")
+def get_point_settings(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """
+    Kembalikan semua pengaturan poin sebagai dict {key: {label, points, balance}}.
+    Format ini langsung kompatibel dengan PointSettingsPanel di frontend.
+    """
+    rows = db.query(PointSetting).all()
+    return {
+        row.key: {
+            "label":   row.label,
+            "points":  row.points,
+            "balance": row.balance,
+        }
+        for row in rows
+    }
+
+
+@router.put("/point-settings")
+def update_point_settings(
+    payload: Dict[str, PointSettingItem],
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """
+    Terima dict {key: {label, points, balance}} dari frontend.
+    Upsert tiap key ke tabel point_settings.
+    """
+    for key, item in payload.items():
+        row = db.query(PointSetting).filter(PointSetting.key == key).first()
+        if row:
+            row.label   = item.label
+            row.points  = item.points
+            row.balance = item.balance
+        else:
+            db.add(PointSetting(
+                key=key,
+                label=item.label,
+                points=item.points,
+                balance=item.balance,
+            ))
+
+    db.commit()
+    return {"message": "Pengaturan poin berhasil disimpan"}
 
 
 # =========================================================
@@ -366,6 +410,8 @@ def analytics_timeseries(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
+    from datetime import timedelta
+
     raw_data = (
         db.query(
             func.date(Prediction.created_at).label("date"),

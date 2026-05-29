@@ -1,59 +1,35 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProfileForm from "../../components/profile/ProfileForm.jsx";
+import api from "@/lib/axios";  // ← ganti fetch hardcoded dengan axios instance
 
 function Profile() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(null);
+  const [form,  setForm]  = useState(null);
   const [error, setError] = useState("");
-  const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          throw new Error("Gagal mengambil data profil");
-        }
-
-        const data = await res.json();
+        const { data } = await api.get("/users/me");  // ← ganti fetch localhost
         setForm({
-          full_name: data.full_name || "",
-          email: data.email || "",
+          full_name:    data.full_name    || "",
+          email:        data.email        || "",
           phone_number: data.phone_number || "",
-          city: data.city || "",
-          bio: data.bio || "",
+          city:         data.city         || "",
+          bio:          data.bio          || "",
         });
       } catch (err) {
-        setError(err.message || "Terjadi kesalahan");
+        setError(err.response?.data?.detail || err.message || "Terjadi kesalahan");
       }
     };
 
-    if (token) {
-      fetchUser();
-    }
-  }, [token]);
+    fetchUser();
+  }, []);
 
   const handleSave = async (data) => {
-    const res = await fetch("http://localhost:8000/api/v1/users/me", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
+    const { data: result } = await api.put("/users/me", data);  // ← ganti fetch localhost
 
-    const result = await res.json();
-
-    if (!res.ok) {
-      throw new Error(result.detail || "Gagal update");
-    }
-
-    // ✓ FIX: Redirect ke dashboard setelah sukses
     navigate("/dashboard", {
       state: { message: "Profil berhasil diperbarui!" },
     });

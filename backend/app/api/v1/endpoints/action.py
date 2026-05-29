@@ -43,8 +43,6 @@ def create_action(
     """
     User memilih jalur aksi setelah melihat rekomendasi scan.
     Status = pending, poin dan saldo belum diberikan.
-    
-    ✓ FIX: Return ActionResponse (full object), bukan message + action_id
     """
     if payload.route not in ("mandiri", "mitra"):
         raise HTTPException(
@@ -66,7 +64,7 @@ def create_action(
     db.add(action)
     db.commit()
     db.refresh(action)
-    
+
     return action
 
 
@@ -88,6 +86,7 @@ def get_my_actions(
         .all()
     )
 
+
 # ─── 2.5 User lihat aktivitas terbaru ─────────────────────
 @router.get("/activity")
 def get_recent_activity(
@@ -99,7 +98,6 @@ def get_recent_activity(
     Gabungkan riwayat scan + action user.
     Dipakai untuk dashboard activity terbaru.
     """
-
     predictions = (
         db.query(Prediction)
         .filter(Prediction.user_id == current_user.id)
@@ -129,19 +127,16 @@ def get_recent_activity(
 
     action_items = [
         {
-        "type": "action",
-        "id": a.id,
-        "title":
-            f"Aksi {a.action_type}",
-        "description":
-            getattr(a, "notes", None)
-            or f"Status: {a.status}",
-        "created_at":
-            a.created_at,
-        "status":
-            getattr(a, "status", None),
-        "points_earned":
-            getattr(a, "points_earned", 0) or 0,
+            "type": "action",
+            "id": a.id,
+            "title": f"Aksi {a.action_type}",
+            "description": (
+                getattr(a, "notes", None)
+                or f"Status: {a.status}"
+            ),
+            "created_at": a.created_at,
+            "status": getattr(a, "status", None),
+            "points_earned": getattr(a, "points_earned", 0) or 0,
         }
         for a in actions
     ]
@@ -153,6 +148,7 @@ def get_recent_activity(
     )
 
     return merged[:limit]
+
 
 # ─── 3. Admin: jumlah aksi pending ─────────────────────────
 @router.get("/pending/count")
@@ -169,7 +165,6 @@ def get_pending_count(
     return {"count": count}
 
 
-# ─── 4. Admin: lihat semua aksi pending ────────────────────
 @router.get("/pending", response_model=list[ActionResponse])
 def get_pending_actions(
     skip: int = 0,
@@ -180,13 +175,14 @@ def get_pending_actions(
     """Admin: lihat semua aksi yang menunggu verifikasi."""
     return (
         db.query(Action)
+        .options(joinedload(Action.user))          # ← sertakan data user sekalian
         .filter(Action.status == "pending")
         .order_by(Action.created_at.asc())
         .offset(skip)
         .limit(limit)
         .all()
     )
-
+ 
 
 # ─── 5. User upload bukti foto ──────────────────────────────
 @router.post("/{action_id}/proof", response_model=ActionResponse)
@@ -282,6 +278,7 @@ def verify_action(
         user.action_count = (user.action_count or 0) + 1
 
         if action.route == "mitra" and payload.weight_gram:
+            action.weight_gram = payload.weight_gram  # ← disimpan ke DB
             balance = (payload.weight_gram / 1000) * settings.balance_per_kg
             action.balance_earned = int(balance)
             user.balance = (user.balance or 0) + int(balance)
@@ -294,6 +291,7 @@ def verify_action(
         total_points=user.total_points,
         total_balance=user.balance,
     )
+
 
 # ─── 7. Detail aktivitas user ─────────────────────────────
 @router.get("/activity/{activity_type}/{activity_id}")
@@ -312,9 +310,7 @@ def get_activity_detail(
 
         prediction = (
             db.query(Prediction)
-            .options(
-                joinedload(Prediction.action)
-            )
+            .options(joinedload(Prediction.action))
             .filter(
                 Prediction.id == activity_id,
                 Prediction.user_id == current_user.id,
@@ -336,7 +332,6 @@ def get_activity_detail(
             "confidence": prediction.confidence,
             "recommendation": prediction.recommendation,
             "created_at": prediction.created_at,
-
             "action": (
                 {
                     "id": prediction.action.id,
@@ -357,9 +352,7 @@ def get_activity_detail(
 
         action = (
             db.query(Action)
-            .options(
-                joinedload(Action.prediction)
-            )
+            .options(joinedload(Action.prediction))
             .filter(
                 Action.id == activity_id,
                 Action.user_id == current_user.id,
@@ -376,42 +369,24 @@ def get_activity_detail(
         return {
             "type": "action",
             "id": action.id,
-            "action_type":
-                action.action_type,
-            "route":
-                action.route,
-            "status":
-                action.status,
-            "notes":
-                action.notes,
-            "points_earned":
-                action.points_earned,
-            "balance_earned":
-                action.balance_earned,
-            "proof_image_path":
-                action.proof_image_path,
-            "rejection_reason":
-                action.rejection_reason,
-            "verified_at":
-                action.verified_at,
-            "created_at":
-                action.created_at,
+            "action_type": action.action_type,
+            "route": action.route,
+            "status": action.status,
+            "notes": action.notes,
+            "points_earned": action.points_earned,
+            "balance_earned": action.balance_earned,
+            "weight_gram": action.weight_gram,           # ← ditambahkan
+            "proof_image_path": action.proof_image_path,
+            "rejection_reason": action.rejection_reason,
+            "verified_at": action.verified_at,
+            "created_at": action.created_at,
             "prediction": (
                 {
-                    "id":
-                        action.prediction.id,
-
-                    "image_path":
-                        action.prediction.image_path,
-
-                    "result":
-                        action.prediction.result,
-
-                    "confidence":
-                        action.prediction.confidence,
-
-                    "recommendation":
-                        action.prediction.recommendation,
+                    "id": action.prediction.id,
+                    "image_path": action.prediction.image_path,
+                    "result": action.prediction.result,
+                    "confidence": action.prediction.confidence,
+                    "recommendation": action.prediction.recommendation,
                 }
                 if action.prediction
                 else None

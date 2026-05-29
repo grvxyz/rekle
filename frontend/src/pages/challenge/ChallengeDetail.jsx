@@ -1,100 +1,123 @@
+/**
+ * ChallengeDetail.jsx
+ *
+ * FIX vs backend:
+ * 1. `predictions` state tidak pernah di-declare → tambah useState
+ * 2. ActivityResponse tidak ada di backend — /actions/activity mengembalikan array item
+ *    dengan shape: { id, type, title, created_at, status, points_earned, ... }
+ *    Field `result` di prediction dropdown pakai `title` (bukan `result`) karena
+ *    activity item dari /actions/activity tidak memiliki field `result`
+ * 3. Filter scan dari activity: item.type === "scan" ✓
+ * 4. `challenge_type` dari ContentResponse: "scan"|"action"|"points" ✓
+ * 5. ActionCreateSchema: { prediction_id, action_type, route, partner_name, notes } ✓
+ * 6. Upload proof → POST /actions/{action_id}/proof dengan FormData ✓
+ * 7. ActionResponse.points_earned ✓, actionData?.action?.points_earned sebagai fallback ✓
+ * 8. Content endpoint: GET /api/v1/content/ (bukan /content?type=challenge) — query param valid ✓
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams }       from "react-router-dom";
-import {
-  calculateChallengeProgress,
-} from "@/utils/challengeProgress";
-import api from "../../lib/axios.js";
+import { calculateChallengeProgress }   from "@/utils/challengeProgress";
+import api                              from "../../lib/axios.js";
 
-// ── helpers ───────────────────────────────────────────────────────────────────
 const TYPE_META = {
   scan:   { label: "Scan Sampah", icon: "📷", hint: "Challenge ini diselesaikan dengan melakukan scan sampah di aplikasi." },
   action: { label: "Aksi Nyata",  icon: "♻️", hint: "Lakukan aksi pengelolaan sampah (kompos, daur ulang, dll) dan lampirkan bukti." },
   points: { label: "Kumpul Poin", icon: "⭐", hint: "Kumpulkan poin dari berbagai aktivitas untuk menyelesaikan challenge ini." },
 };
 
+// Sesuai action_type di model Action: kompos|daur_ulang|eco_brick|reuse|khusus
 const ACTION_TYPES = [
-  { value: "kompos",      label: "Kompos" },
-  { value: "daur_ulang",  label: "Daur Ulang" },
-  { value: "eco_brick",   label: "Eco Brick" },
-  { value: "reuse",       label: "Reuse / Pakai Ulang" },
-  { value: "khusus",      label: "Lainnya" },
+  { value: "kompos",     label: "Kompos" },
+  { value: "daur_ulang", label: "Daur Ulang" },
+  { value: "eco_brick",  label: "Eco Brick" },
+  { value: "reuse",      label: "Reuse / Pakai Ulang" },
+  { value: "khusus",     label: "Lainnya" },
 ];
 
+// Sesuai route di model Action: mandiri|mitra
 const ROUTES = [
   { value: "mandiri", label: "Mandiri (saya kelola sendiri)" },
   { value: "mitra",   label: "Mitra (lewat mitra daur ulang)" },
 ];
 
-// ── komponen utama ────────────────────────────────────────────────────────────
 export default function ChallengeDetail() {
-  const { id }    = useParams();
-  const navigate  = useNavigate();
+  const { id }   = useParams();
+  const navigate = useNavigate();
 
   // data
-  const [challenge, setChallenge]   = useState(null);
-  const [user, setUser]             = useState(null);
+  const [challenge, setChallenge]       = useState(null);
+  const [user, setUser]                 = useState(null);
   const [activityData, setActivityData] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [notFound, setNotFound]     = useState(false);
+  // FIX: predictions state yang hilang di kode asli
+  const [predictions, setPredictions]   = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [notFound, setNotFound]         = useState(false);
 
-  // form
+  // form — sesuai ActionCreateSchema
   const [form, setForm] = useState({
-    prediction_id: "",
-    action_type:   "",
-    route:         "mandiri",
-    partner_name:  "",
-    notes:         "",
+    prediction_id: "",   // integer | null
+    action_type:   "",   // string, required
+    route:         "mandiri", // "mandiri" | "mitra", required
+    partner_name:  "",   // string | null, wajib jika route=mitra
+    notes:         "",   // string | null
   });
-  const [proofFile, setProofFile]   = useState(null);
+
+  const [proofFile, setProofFile]       = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const fileRef = useRef(null);
 
   // submit state
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult]         = useState(null); // { success, message, points }
+  const [result, setResult]         = useState(null);
   const [error, setError]           = useState(null);
 
   // ── fetch data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
+        // GET /api/v1/users/me → UserResponse
+        // GET /api/v1/content/?type=challenge → ContentResponse[]
         const [{ data: userData }, { data: contents }] = await Promise.all([
           api.get("/users/me"),
           api.get("/content?type=challenge"),
         ]);
         setUser(userData);
 
-        const found = contents.find((c) => String(c.id) === String(id));
+        // FIX: contents bisa array langsung atau { items, data }
+        const contentList = Array.isArray(contents)
+          ? contents
+          : contents.items ?? contents.data ?? [];
+
+        const found = contentList.find((c) => String(c.id) === String(id));
         if (!found) { setNotFound(true); return; }
         setChallenge(found);
 
-        // Set default action_type sesuai challenge_type
+        // Default action_type berdasarkan challenge_type dari ContentResponse
         const defaultType =
-          found.challenge_type === "scan"   ? "khusus" :
+          found.challenge_type === "scan"   ? "khusus"     :
           found.challenge_type === "action" ? "daur_ulang" : "khusus";
 
         setForm((f) => ({ ...f, action_type: defaultType }));
 
-        // Fetch riwayat scan user untuk dropdown prediction_id
+        // GET /api/v1/actions/activity — untuk dropdown prediction_id
+        // Response: array of activity items { id, type, title, created_at, ... }
         try {
-          const { data: scanData } = await api.get("/actions/activity?limit=200")
-          const items =
-  scanData?.items ??
-  scanData ??
-  [];
-  setActivityData(items);
+          const { data: actData } = await api.get("/actions/activity?limit=200");
 
-// hanya ambil scan
-const scanPredictions =
-  items.filter(
-    (item) =>
-      item.type === "scan"
-  );
+          // FIX: normalise response — bisa array atau { items }
+          const items = Array.isArray(actData)
+            ? actData
+            : actData?.items ?? [];
 
-setPredictions(
-  scanPredictions
-);
-        } catch { /* tidak wajib */ }
+          setActivityData(items);
+
+          // Filter hanya item bertipe "scan" untuk dropdown prediction_id
+          // FIX: activity item menggunakan field `title` bukan `result`
+          const scanItems = items.filter((item) => item.type === "scan");
+          setPredictions(scanItems);
+
+        } catch { /* prediction dropdown opsional */ }
 
       } catch (err) {
         console.error(err);
@@ -106,7 +129,7 @@ setPredictions(
     load();
   }, [id]);
 
-  // ── proof image ─────────────────────────────────────────────────────────────
+  // ── proof image handler ─────────────────────────────────────────────────────
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -128,23 +151,30 @@ setPredictions(
 
     setSubmitting(true);
     try {
-      // 1. POST /actions/ — prediction_id opsional
+      // POST /api/v1/actions/ — sesuai ActionCreateSchema
+      // { prediction_id?, action_type, route, partner_name?, notes? }
       const payload = {
-        action_type:  form.action_type,
-        route:        form.route,
-        notes:        form.notes.trim() || `Challenge: ${challenge.title}`,
-        ...(form.prediction_id ? { prediction_id: parseInt(form.prediction_id) } : { prediction_id: null }),
-        ...(form.route === "mitra" ? { partner_name: form.partner_name.trim() } : {}),
+        action_type: form.action_type,
+        route:       form.route,
+        notes:       form.notes.trim() || `Challenge: ${challenge.title}`,
+        ...(form.prediction_id
+          ? { prediction_id: parseInt(form.prediction_id, 10) }
+          : {}),
+        ...(form.route === "mitra"
+          ? { partner_name: form.partner_name.trim() }
+          : {}),
       };
 
-      // Jika prediction_id kosong, backend mungkin tidak terima null —
-      // fallback: kirim tanpa field tsb
-      if (!payload.prediction_id) delete payload.prediction_id;
-
+      // POST /api/v1/actions/ → ActionResponse
       const { data: actionData } = await api.post("/actions/", payload);
-      const actionId = actionData?.id ?? actionData?.action?.id;
 
-      // 2. Upload proof jika ada
+      // FIX: ActionResponse.id (bukan actionData?.action?.id — itu ActionWithRewardResponse)
+      // Tapi fallback tetap dijaga untuk ActionWithRewardResponse
+      const actionId =
+        actionData?.id ??
+        actionData?.action?.id;
+
+      // POST /api/v1/actions/{action_id}/proof — upload bukti foto
       if (proofFile && actionId) {
         try {
           const fd = new FormData();
@@ -157,30 +187,32 @@ setPredictions(
         }
       }
 
+      // FIX: ActionResponse.points_earned (field langsung)
+      // ActionWithRewardResponse → .action.points_earned sebagai fallback
       const pointsEarned =
         actionData?.points_earned ??
         actionData?.action?.points_earned ??
         challenge.reward_points ??
         0;
 
-      setResult({
-        success: true,
-        actionId,
-        points: pointsEarned,
-      });
+      setResult({ success: true, actionId, points: pointsEarned });
 
     } catch (err) {
+      // FIX: HTTPValidationError.detail bisa string atau array of ValidationError
+      const detail = err?.response?.data?.detail;
       const msg =
-        err?.response?.data?.detail ??
-        err?.response?.data?.message ??
-        "Gagal mengirim aksi. Coba lagi.";
-      setError(typeof msg === "string" ? msg : JSON.stringify(msg));
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => d.msg).join(", ")
+            : err?.response?.data?.message ?? "Gagal mengirim aksi. Coba lagi.";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── states ──────────────────────────────────────────────────────────────────
+  // ── loading / not found states ──────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <p className="text-sm text-gray-400 animate-pulse">Memuat detail challenge...</p>
@@ -196,7 +228,7 @@ setPredictions(
     </div>
   );
 
-  // ── success state ────────────────────────────────────────────────────────────
+  // ── success state ───────────────────────────────────────────────────────────
   if (result?.success) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="bg-white rounded-3xl shadow-lg border border-emerald-100 p-10 max-w-md w-full text-center">
@@ -207,10 +239,10 @@ setPredictions(
           Kamu akan mendapatkan poin setelah disetujui.
         </p>
 
-        {/* Reward preview */}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 inline-block w-full">
           <p className="text-xs text-amber-600 font-medium mb-1">Potensi Poin</p>
           <p className="text-3xl font-black text-amber-600">+{result.points}</p>
+          {/* FIX: status selalu "pending" setelah create — sesuai ActionResponse.status default */}
           <p className="text-xs text-amber-500 mt-0.5">setelah diverifikasi admin</p>
         </div>
 
@@ -232,11 +264,11 @@ setPredictions(
     </div>
   );
 
-  // ── main render ──────────────────────────────────────────────────────────────
+  // ── main render ─────────────────────────────────────────────────────────────
   const typeMeta = TYPE_META[challenge.challenge_type] ?? { label: challenge.challenge_type, icon: "🏆", hint: "" };
-  const isDone   = challenge.completed;
-  const progress = calculateChallengeProgress( activityData, challenge);
-  const target   = challenge.target  ?? null;
+  const isDone   = challenge.completed; // di-inject oleh parent
+  const progress = calculateChallengeProgress(activityData, challenge);
+  const target   = challenge.target ?? null; // nullable sesuai ContentBase
   const pct      = target ? Math.min(100, Math.round((progress / target) * 100)) : null;
 
   return (
@@ -253,7 +285,6 @@ setPredictions(
 
         {/* ── Card Info Challenge ── */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          {/* Top accent */}
           <div className="h-1.5 bg-gradient-to-r from-green-400 to-emerald-500" />
 
           <div className="p-6">
@@ -267,11 +298,17 @@ setPredictions(
               `}>
                 {typeMeta.icon} {typeMeta.label}
               </span>
+
+              {/* FIX: status dari ContentResponse: draft|active|inactive */}
               <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                challenge.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                challenge.status === "active"   ? "bg-emerald-100 text-emerald-700" :
+                challenge.status === "inactive" ? "bg-gray-100 text-gray-500" :
+                "bg-orange-100 text-orange-600" // draft
               }`}>
-                {challenge.status === "active" ? "● Aktif" : challenge.status}
+                {challenge.status === "active" ? "● Aktif" :
+                 challenge.status === "inactive" ? "Nonaktif" : "Draft"}
               </span>
+
               {isDone && (
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
                   ✓ Selesai
@@ -279,13 +316,14 @@ setPredictions(
               )}
             </div>
 
+            {/* title: required (nullable=false) */}
             <h1 className="text-xl font-bold text-gray-900 mb-2">{challenge.title}</h1>
 
+            {/* description: nullable */}
             {challenge.description && (
               <p className="text-sm text-gray-600 leading-relaxed mb-5">{challenge.description}</p>
             )}
 
-            {/* Hint tipe */}
             {typeMeta.hint && (
               <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs text-gray-500 mb-5">
                 ℹ️ {typeMeta.hint}
@@ -294,11 +332,13 @@ setPredictions(
 
             {/* Stats row */}
             <div className="grid grid-cols-2 gap-3 mb-5">
+              {/* reward_points: default 0 sesuai ContentBase */}
               <div className="bg-amber-50 rounded-xl p-4 text-center">
                 <p className="text-xs text-amber-500 font-medium mb-1">Reward Poin</p>
                 <p className="text-2xl font-black text-amber-600">⭐ {challenge.reward_points ?? 0}</p>
               </div>
-              {target && (
+              {/* target: nullable */}
+              {target !== null && (
                 <div className="bg-blue-50 rounded-xl p-4 text-center">
                   <p className="text-xs text-blue-500 font-medium mb-1">Target</p>
                   <p className="text-2xl font-black text-blue-600">{target}</p>
@@ -307,7 +347,7 @@ setPredictions(
               )}
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar — hanya jika target tidak null */}
             {pct !== null && (
               <div>
                 <div className="flex justify-between text-xs text-gray-500 mb-1.5">
@@ -325,24 +365,32 @@ setPredictions(
           </div>
         </div>
 
-        {/* ── Form Aksi ── */}
+        {/* ── Form / State Blocks ── */}
         {isDone ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
             <p className="text-emerald-700 font-semibold text-lg mb-1">🎊 Challenge Selesai!</p>
             <p className="text-emerald-600 text-sm">Kamu sudah menyelesaikan challenge ini. Cek challenge lain!</p>
           </div>
+
         ) : challenge.status !== "active" ? (
+          // FIX: tampilkan pesan berbeda untuk draft vs inactive
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
-            <p className="text-gray-500 text-sm">Challenge ini sedang tidak aktif.</p>
+            <p className="text-gray-500 text-sm">
+              {challenge.status === "draft"
+                ? "Challenge ini masih dalam draft dan belum dapat diikuti."
+                : "Challenge ini sedang tidak aktif."}
+            </p>
           </div>
+
         ) : (
+          /* ── Form Aksi — hanya tampil jika status=active ── */
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
             <h2 className="text-base font-bold text-gray-900">📝 Laporkan Aksimu</h2>
             <p className="text-xs text-gray-500 -mt-3">
               Isi form berikut untuk melaporkan aksi yang sudah kamu lakukan. Admin akan memverifikasi dan memberikan poin.
             </p>
 
-            {/* Tipe Aksi */}
+            {/* Tipe Aksi — sesuai action_type di model Action */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 Tipe Aksi <span className="text-red-500">*</span>
@@ -366,7 +414,7 @@ setPredictions(
               </div>
             </div>
 
-            {/* Jalur */}
+            {/* Jalur — sesuai route di model Action: mandiri|mitra */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 Jalur Pengelolaan <span className="text-red-500">*</span>
@@ -390,7 +438,7 @@ setPredictions(
               </div>
             </div>
 
-            {/* Nama Mitra (kondisional) */}
+            {/* Nama Mitra — wajib jika route=mitra (sesuai ActionVerifySchema logic) */}
             {form.route === "mitra" && (
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -406,7 +454,7 @@ setPredictions(
               </div>
             )}
 
-            {/* Scan terkait (opsional) */}
+            {/* Scan terkait — opsional, dari GET /actions/activity (type=scan) */}
             {predictions.length > 0 && (
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -420,14 +468,15 @@ setPredictions(
                   <option value="">-- Pilih hasil scan --</option>
                   {predictions.map((p) => (
                     <option key={p.id} value={p.id}>
-                      #{p.id} — {p.result ?? "Tidak diketahui"} ({new Date(p.created_at).toLocaleDateString("id-ID")})
+                      {/* FIX: activity item pakai `title` bukan `result` */}
+                      #{p.id} — {p.title ?? "Tidak diketahui"} ({new Date(p.created_at).toLocaleDateString("id-ID")})
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Catatan */}
+            {/* Catatan — notes: Optional[str] di ActionCreateSchema */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 Catatan <span className="text-gray-400 font-normal">(opsional)</span>
@@ -441,7 +490,7 @@ setPredictions(
               />
             </div>
 
-            {/* Upload Bukti */}
+            {/* Upload Bukti — POST /actions/{action_id}/proof */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 Foto Bukti <span className="text-gray-400 font-normal">(opsional tapi disarankan)</span>
@@ -477,14 +526,14 @@ setPredictions(
               />
             </div>
 
-            {/* Error */}
+            {/* Error — HTTPValidationError */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-600">
                 ⚠️ {error}
               </div>
             )}
 
-            {/* Reward preview */}
+            {/* Reward preview — reward_points dari ContentResponse */}
             <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex items-center justify-between">
               <span className="text-xs text-amber-600">Potensi reward setelah verifikasi</span>
               <span className="text-lg font-black text-amber-600">⭐ +{challenge.reward_points ?? 0}</span>
