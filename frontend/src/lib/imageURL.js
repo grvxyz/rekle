@@ -12,11 +12,19 @@ import api from "@/lib/axios";
 
 /**
  * Ambil base origin dari axios instance (buang path "/api/v1").
- * Contoh: "http://localhost:8000/api/v1" → "http://localhost:8000"
- *         "https://api.rekle.id/api/v1"  → "https://api.rekle.id"
+ * 
+ * Special case untuk production:
+ * - Frontend di rekle.vercel.app
+ * - API/Images di rekle.ranggapasha.my.id
  */
 function getBaseOrigin() {
   const baseURL = api.defaults.baseURL || "";
+  
+  // Jika running di Vercel production, pointing ke production backend
+  if (typeof window !== "undefined" && window.location.hostname === "rekle.vercel.app") {
+    return "https://rekle.ranggapasha.my.id";
+  }
+  
   try {
     const url = new URL(baseURL);
     return url.origin; // hanya scheme + host + port
