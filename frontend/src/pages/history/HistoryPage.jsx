@@ -20,6 +20,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import api from "@/lib/axios";
+import { buildImageUrl } from "@/lib/imageURL";
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -565,10 +566,10 @@ const HistoryPage = () => {
               {(selectedActivity.image_path ||
                 selectedActivity.prediction?.image_path) && (
                 <img
-                  src={`${BASE_URL}/${
+                  src={buildImageUrl(
                     selectedActivity.image_path ||
                     selectedActivity.prediction?.image_path
-                  }`}
+                  )}
                   alt="Activity"
                   className="w-full h-72 object-cover rounded-2xl border"
                 />
@@ -830,10 +831,10 @@ const HistoryPage = () => {
                 </p>
               </div>
               <img
-                src={`${BASE_URL}/${
+                src={buildImageUrl(
                   selectedActivity.proof_image_path ||
                   selectedActivity.action?.proof_image_path
-                }`}
+                )}
                 alt="Proof"
                 className="w-full h-72 object-cover rounded-2xl border"
               />
