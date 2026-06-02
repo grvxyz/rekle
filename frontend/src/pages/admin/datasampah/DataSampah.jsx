@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Search, Filter, Image as ImageIcon, CheckCircle2, AlertTriangle, Brain } from "lucide-react";
 import api from "@/lib/axios";
+import { buildImageUrl } from "@/lib/imageURL";
 import dayjs from "dayjs";
 
 // ======================================================
@@ -45,33 +46,6 @@ function getConfidenceColor(confidence) {
   if (confidence >= 0.75) return "bg-green-400";
   if (confidence >= 0.6)  return "bg-yellow-400";
   return "bg-red-400";
-}
-
-// ── Build URL gambar dari path relatif atau absolut ────────
-const BASE_MEDIA_URL = "http://127.0.0.1:8000";
-
-function buildImageUrl(path) {
-  if (!path) return null;
-  // Sudah full URL, pakai langsung
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  // Hilangkan leading slash agar tidak double slash
-  return `${BASE_MEDIA_URL}/${path.replace(/^\/+/, "")}`;
-}
-
-// ======================================================
-// SKELETON
-// ======================================================
-
-function SkeletonRow() {
-  return (
-    <tr className="border-b border-gray-100">
-      {[...Array(7)].map((_, i) => (
-        <td key={i} className="px-4 py-4">
-          <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: i === 0 ? 40 : i === 3 ? 120 : 80 }} />
-        </td>
-      ))}
-    </tr>
-  );
 }
 
 // ======================================================
