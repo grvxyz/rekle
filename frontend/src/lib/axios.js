@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8000/api/v1";
+const BASE_URL = "https://rekle.ranggapasha.my.id/api/v1";
 
 const api = axios.create({
   baseURL: BASE_URL,
