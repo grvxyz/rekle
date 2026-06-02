@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 import api from "../../lib/axios.js";
+import { buildImageUrl } from "../../lib/imageURL.js";
 
 import {
   Card,
@@ -359,10 +360,10 @@ function RecentHistory({
                 ) && (
 
                 <img
-                  src={`http://localhost:8000/${
+                  src={buildImageUrl(
                     selectedActivity.image_path ||
                     selectedActivity.prediction?.image_path
-                  }`}
+                  )}
                   alt="Activity"
                   className="w-full h-72 object-cover rounded-2xl border"
                 />

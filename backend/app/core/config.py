@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
 
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    allowed_origins: str = "https://rekle.vercel.app,http://localhost:5173"
 
     @property
     def allowed_origins_list(self) -> List[str]:
