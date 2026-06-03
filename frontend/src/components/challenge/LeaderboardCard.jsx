@@ -1,90 +1,48 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "../ui/card.jsx";
 import SectionHeader from "../ui/SectionHeader.jsx";
-import { Trophy, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Trophy, AlertCircle, RefreshCw } from "lucide-react";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-/**
- * Ambil token dari storage (sesuaikan dengan mekanisme auth aplikasimu).
- */
 function getAccessToken() {
   return localStorage.getItem("access_token") ?? "";
 }
 
-/**
- * Fetch top users dari REKLE backend.
- *
- * Endpoint yang dicoba secara berurutan:
- *  1. GET /api/v1/admin/analytics/insights  → field `top_users`
- *  2. GET /api/v1/admin/dashboard           → field `top_users`
- *
- * Setiap item diharapkan memiliki setidaknya { id, name/full_name/email, points/total_points/score }.
- */
 async function fetchLeaderboard(limit = 10) {
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${getAccessToken()}`,
-  };
-
-  const endpoints = [
-    `${BASE_URL}/api/v1/admin/analytics/insights`,
-    `${BASE_URL}/api/v1/admin/dashboard`,
-  ];
-
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url, { headers });
-      if (!res.ok) continue;
-
-      const json = await res.json();
-
-      // Normalise: cari array top_users / leaderboard / users di respons
-      const raw =
-        json?.top_users ??
-        json?.leaderboard ??
-        json?.data?.top_users ??
-        json?.data?.leaderboard ??
-        null;
-
-      if (Array.isArray(raw) && raw.length > 0) {
-        return raw.slice(0, limit).map((u, i) => ({
-          id: u.id ?? u.user_id ?? i,
-          name:
-            u.name ??
-            u.full_name ??
-            u.username ??
-            u.email ??
-            `Pengguna ${i + 1}`,
-          points:
-            u.points ??
-            u.total_points ??
-            u.score ??
-            u.reward_points ??
-            0,
-        }));
-      }
-    } catch {
-      // lanjut ke endpoint berikutnya
+  const res = await fetch(
+    `${BASE_URL}/api/v1/users/leaderboard?limit=${limit}`,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
     }
-  }
-
-  throw new Error(
-    "Tidak dapat memuat data leaderboard. Pastikan kamu memiliki akses admin."
   );
+
+  if (!res.ok) throw new Error("Gagal memuat leaderboard");
+
+  const data = await res.json();
+  return data.map((u, i) => ({
+    id:     u.id ?? i,
+    name:   u.full_name ?? `Pengguna ${i + 1}`,
+    city:   u.city ?? null,
+    avatar: u.avatar_url ?? null,
+    points: u.total_points ?? 0,
+  }));
 }
 
 // ─── Medal colours ────────────────────────────────────────────────────────────
 const MEDAL = {
-  0: { bg: "bg-amber-50",    text: "text-amber-600",   ring: "ring-amber-300"  },
-  1: { bg: "bg-slate-100",   text: "text-slate-500",   ring: "ring-slate-300"  },
-  2: { bg: "bg-orange-50",   text: "text-orange-500",  ring: "ring-orange-300" },
+  0: { bg: "bg-amber-50",  text: "text-amber-600",  ring: "ring-amber-300"  },
+  1: { bg: "bg-slate-100", text: "text-slate-500",  ring: "ring-slate-300"  },
+  2: { bg: "bg-orange-50", text: "text-orange-500", ring: "ring-orange-300" },
 };
 
 function rankStyle(index) {
   return (
     MEDAL[index] ?? {
-      bg: "bg-emerald-50",
+      bg:   "bg-emerald-50",
       text: "text-emerald-700",
       ring: "ring-emerald-200",
     }
@@ -109,7 +67,7 @@ function ErrorState({ message, onRetry }) {
   return (
     <div className="flex flex-col items-center gap-2 py-6 text-center">
       <AlertCircle className="w-5 h-5 text-red-400" />
-      <p className="text-xs text-gray-500 max-w-50">{message}</p>
+      <p className="text-xs text-gray-500 max-w-[200px]">{message}</p>
       <button
         onClick={onRetry}
         className="mt-1 flex items-center gap-1 text-xs text-emerald-600 hover:underline"
@@ -131,25 +89,12 @@ function EmptyState() {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-/**
- * LeaderboardCard
- *
- * Props:
- *  - users   {Array}   – opsional; jika diisi, data statis ini digunakan
- *                        (berguna saat komponen dipanggil dari parent yang
- *                        sudah punya data, e.g. dari Admin Dashboard).
- *  - limit   {number}  – jumlah maks baris (default 10)
- *  - title   {string}  – judul card
- *  - subtitle{string}  – subjudul card
- *
- * Jika `users` tidak diberikan / kosong, komponen akan fetch sendiri
- * dari REKLE backend.
- */
 function LeaderboardCard({
   users: usersProp = [],
+  currentUserId = null,
   limit = 10,
   title = "Leaderboard",
-  subtitle = "Top pengguna minggu ini",
+  subtitle = "Top pengguna berdasarkan poin",
 }) {
   const [users, setUsers]     = useState(usersProp);
   const [loading, setLoading] = useState(false);
@@ -172,10 +117,8 @@ function LeaderboardCard({
 
   useEffect(() => {
     if (shouldFetch) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Jika props berubah dari luar (e.g. parent refresh), sinkronkan
   useEffect(() => {
     if (!shouldFetch) setUsers(usersProp);
   }, [usersProp, shouldFetch]);
@@ -199,40 +142,50 @@ function LeaderboardCard({
           {!loading && !error && users.length === 0 && <EmptyState />}
 
           {/* Data rows */}
-          {!loading &&
-            !error &&
-            users.map((user, index) => {
-              const style = rankStyle(index);
-              return (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Rank badge */}
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ring-1 ${style.bg} ${style.text} ${style.ring}`}
-                    >
-                      {index + 1}
-                    </div>
+          {!loading && !error && users.map((user, index) => {
+            const style = rankStyle(index);
+            const isMe  = currentUserId && user.id === currentUserId;
 
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">
-                        {user.name}
-                      </p>
-                    </div>
+            return (
+              <div
+                key={user.id}
+                className={`flex items-center justify-between rounded-lg px-2 py-1 transition-colors ${
+                  isMe ? "bg-emerald-50 ring-1 ring-emerald-200" : ""
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Rank badge */}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ring-1 ${style.bg} ${style.text} ${style.ring}`}
+                  >
+                    {index + 1}
                   </div>
 
-                  {/* Points */}
-                  <div className="flex items-center gap-1 text-amber-500">
-                    <Trophy className="w-4 h-4" />
-                    <span className="text-sm font-semibold">
-                      {user.points.toLocaleString("id-ID")}
-                    </span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                      {user.name}
+                      {isMe && (
+                        <span className="text-xs text-emerald-500 font-normal">
+                          (Kamu)
+                        </span>
+                      )}
+                    </p>
+                    {user.city && (
+                      <p className="text-xs text-gray-400">{user.city}</p>
+                    )}
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Points */}
+                <div className="flex items-center gap-1 text-amber-500">
+                  <Trophy className="w-4 h-4" />
+                  <span className="text-sm font-semibold">
+                    {user.points.toLocaleString("id-ID")}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

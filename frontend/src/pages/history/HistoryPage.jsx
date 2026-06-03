@@ -302,7 +302,7 @@ const HistoryPage = () => {
 
             <button
               onClick={() =>
-                navigate(-1)
+                navigate("/dashboard")
               }
               className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
             >

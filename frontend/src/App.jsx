@@ -136,8 +136,8 @@ function Footer() {
 
           {/* Links */}
           <div className="flex flex-wrap justify-center sm:justify-end gap-x-8 gap-y-3 text-sm">
-            <a href="/#features" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Fitur</a>
             <a href="/scan" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Scan</a>
+            <a href="/challenge" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">challenge</a>
             <a href="/mitra/register" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Daftar Mitra</a>
             <a href="/mitra/login" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Login Mitra</a>
             <a href="/login" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Masuk</a>
