@@ -1,9 +1,8 @@
-
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import logo from "../../logo.svg";
 import Button from "../ui/button.jsx";
-import { User, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
+import { User, LogOut, LayoutDashboard, Menu, X, Trophy, ClipboardList } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
 
 function Navbar() {
@@ -28,15 +27,12 @@ function Navbar() {
     setScrolled(currentY > 10);
 
     if (currentY < 10) {
-      // Selalu tampil di paling atas
       setVisible(true);
     } else if (currentY > lastScrollY.current + 8) {
-      // Scroll ke bawah → sembunyikan
       setVisible(false);
       setDropdownOpen(false);
       setMobileOpen(false);
     } else if (currentY < lastScrollY.current - 8) {
-      // Scroll ke atas → tampilkan
       setVisible(true);
     }
 
@@ -51,18 +47,16 @@ function Navbar() {
   // ── Click outside dropdown ─────────────────────────────────────────────────
   useEffect(() => {
     if (!dropdownOpen) return;
-
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [dropdownOpen]);
 
-  // ── Tutup mobile menu saat route berubah ──────────────────────────────────
+  // ── Tutup menu saat route berubah ─────────────────────────────────────────
   useEffect(() => {
     setMobileOpen(false);
     setDropdownOpen(false);
@@ -130,6 +124,7 @@ function Navbar() {
 
                     {dropdownOpen && (
                       <div className="absolute right-0 mt-2 w-48 bg-white border rounded-xl shadow-md overflow-hidden z-50">
+
                         <button
                           onClick={() => goTo(dashboardPath)}
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
@@ -138,15 +133,36 @@ function Navbar() {
                           Dashboard
                         </button>
 
+                        {/* Menu khusus user biasa */}
                         {!isSuperuser && (
-                          <button
-                            onClick={() => goTo("/profile")}
-                            className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
-                          >
-                            <User className="w-4 h-4" />
-                            Profile
-                          </button>
+                          <>
+                            <button
+                              onClick={() => goTo("/challenge")}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
+                            >
+                              <Trophy className="w-4 h-4" />
+                              Challenge
+                            </button>
+
+                            <button
+                              onClick={() => goTo("/history")}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
+                            >
+                              <ClipboardList className="w-4 h-4" />
+                              Riwayat
+                            </button>
+
+                            <button
+                              onClick={() => goTo("/profile")}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
+                            >
+                              <User className="w-4 h-4" />
+                              Profile
+                            </button>
+                          </>
                         )}
+
+                        <div className="border-t my-1" />
 
                         <button
                           onClick={handleLogout}
@@ -162,7 +178,7 @@ function Navbar() {
               </div>
             </div>
 
-            {/* ── Mobile: tombol hamburger / avatar ── */}
+            {/* ── Mobile: hamburger ── */}
             <div className="flex sm:hidden items-center gap-2">
               {!isLoggedIn ? (
                 <Button as="a" href="/login" className="px-4 py-1.5 rounded-full text-sm">
@@ -186,39 +202,51 @@ function Navbar() {
         <div
           className={`
             sm:hidden overflow-hidden transition-all duration-300 ease-in-out
-            ${mobileOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"}
+            ${mobileOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"}
             bg-white border-t
           `}
         >
           <div className="px-4 py-2 space-y-1">
 
-            {isLoggedIn && isOnLanding && (
-              <button
-                onClick={() => goTo(dashboardPath)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-50"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Kembali ke Dashboard
-              </button>
-            )}
-
+            {/* Dashboard — label berubah sesuai halaman */}
             <button
               onClick={() => goTo(dashboardPath)}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-50"
             >
               <LayoutDashboard className="w-4 h-4" />
-              Dashboard
+              {isOnLanding ? "Kembali ke Dashboard" : "Dashboard"}
             </button>
 
+            {/* Menu khusus user biasa */}
             {!isSuperuser && (
-              <button
-                onClick={() => goTo("/profile")}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-50"
-              >
-                <User className="w-4 h-4" />
-                Profile
-              </button>
+              <>
+                <button
+                  onClick={() => goTo("/challenge")}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-50"
+                >
+                  <Trophy className="w-4 h-4" />
+                  Challenge
+                </button>
+
+                <button
+                  onClick={() => goTo("/history")}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-50"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  Riwayat
+                </button>
+
+                <button
+                  onClick={() => goTo("/profile")}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg hover:bg-gray-50"
+                >
+                  <User className="w-4 h-4" />
+                  Profile
+                </button>
+              </>
             )}
+
+            <div className="border-t my-1" />
 
             <button
               onClick={handleLogout}
@@ -232,7 +260,7 @@ function Navbar() {
         </div>
       </header>
 
-      {/* Spacer agar konten tidak tertutup navbar */}
+      {/* Spacer */}
       <div className="h-[57px]" />
     </>
   );
