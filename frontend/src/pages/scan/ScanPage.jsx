@@ -45,12 +45,7 @@ const ScanPage = () => {
   const handleCameraClick = () => cameraInputRef.current?.click();
 
   const handleAnalyze = async () => {
-    // Guest tidak bisa scan — arahkan ke login
-    if (!isLoggedIn) {
-      navigate("/login", { state: { from: "/scan" } });
-      return;
-    }
-
+    // Guest tetap bisa scan — login hanya diperlukan saat klaim poin
     if (!selectedFile) {
       setError("Silakan pilih gambar terlebih dahulu");
       return;
@@ -63,7 +58,9 @@ const ScanPage = () => {
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const { data } = await api.post("/scan/upload", formData, {
+      // Guest pakai endpoint tanpa auth, user login pakai endpoint yang simpan ke DB & kasih poin
+      const endpoint = isLoggedIn ? "/scan/upload" : "/scan/upload-guest";
+      const { data } = await api.post(endpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -103,17 +100,17 @@ const ScanPage = () => {
               Ambil foto atau unggah gambar sampah untuk diklasifikasikan AI
             </p>
 
-            {/* Banner untuk guest */}
+            {/* Info ringan untuk guest — tidak memblokir */}
             {!isLoggedIn && (
               <div className="mt-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-4 rounded-2xl text-center text-sm">
-                <p className="font-semibold mb-1">Login diperlukan untuk scan</p>
+                <p className="font-semibold mb-1">Scan gratis tanpa login!</p>
                 <p>
-                  Silakan{" "}
+                  Kamu bisa scan sekarang.{" "}
                   <button
                     onClick={() => navigate("/login", { state: { from: "/scan" } })}
                     className="underline font-semibold"
                   >
-                    login
+                    Login
                   </button>
                   {" "}atau{" "}
                   <button
@@ -122,7 +119,7 @@ const ScanPage = () => {
                   >
                     daftar
                   </button>
-                  {" "}untuk menggunakan fitur scan dan mendapatkan poin.
+                  {" "}untuk mendapatkan poin dari hasil scan.
                 </p>
               </div>
             )}
@@ -154,7 +151,7 @@ const ScanPage = () => {
             image={image}
             result={scanResult}
             resetScan={resetScan}
-            isGuest={false}
+            isGuest={!isLoggedIn}
           />
         )}
 

@@ -41,7 +41,7 @@ import KhususPage     from "./pages/action/KhususPage";
 // ── Admin pages ─────────────────────────────────────────────
 import AdminDashboard    from "./pages/admin/dashboard/Dashboard.jsx";
 import KonfirmasiAksi    from "./pages/admin/konfirmasi/KonfirmasiAksi.jsx";
-import VerifikasiMitra   from "./pages/admin/verifikasi-mitra/VerifikasiMitra.jsx"; // ← ditambahkan
+import VerifikasiMitra   from "./pages/admin/verifikasi-mitra/VerifikasiMitra.jsx";
 import UserManagement    from "./pages/admin/user/UserManagement.jsx";
 import DataMitra         from "./pages/admin/mitra/DataMitra.jsx";
 import DataSampah        from "./pages/admin/datasampah/DataSampah.jsx";
@@ -57,7 +57,7 @@ import MitraVerifikasi from "./pages/mitra/MitraVerifikasi.jsx";
 import MitraProfil     from "./pages/mitra/MitraProfil.jsx";
 import MitraRiwayat    from "./pages/mitra/MitraRiwayat.jsx";
 
-// ─── Route Guards ─────────────────────────────────────────────
+// ─── Route Guards ──────────────────────────────────────────────
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, isSuperuser } = useAuth();
@@ -88,7 +88,7 @@ function RedirectIfLoggedIn({ children }) {
   return children;
 }
 
-// ─── Layouts ──────────────────────────────────────────────────
+// ─── Layouts ───────────────────────────────────────────────────
 
 function AdminLayout({ children }) {
   return (
@@ -108,7 +108,62 @@ function MitraLayout({ children }) {
   );
 }
 
-// ─── Root Layout ──────────────────────────────────────────────
+// ─── Footer ────────────────────────────────────────────────────
+
+function Footer() {
+  return (
+    <footer
+      className="border-t"
+      style={{ background: "#0d1f14", borderColor: "rgba(52,211,153,0.12)" }}
+    >
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 sm:py-12">
+        {/* Top row */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-8 mb-8">
+          {/* Brand */}
+          <div className="text-center sm:text-left">
+            <p
+              className="text-2xl font-black text-white mb-1"
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.02em" }}
+            >
+              REKLE
+            </p>
+            <p className="text-xs text-emerald-400/60 max-w-xs leading-relaxed">
+              Platform cerdas klasifikasi sampah berbasis AI untuk lingkungan yang lebih baik.
+            </p>
+          </div>
+
+          {/* Links */}
+          <div className="flex flex-wrap justify-center sm:justify-end gap-x-8 gap-y-3 text-sm">
+            <a href="/#features" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Fitur</a>
+            <a href="/scan" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Scan</a>
+            <a href="/mitra/register" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Daftar Mitra</a>
+            <a href="/mitra/login" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Login Mitra</a>
+            <a href="/login" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Masuk</a>
+            <a href="/register" className="text-white/40 hover:text-emerald-400 transition-colors duration-200">Daftar</a>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="w-full h-px mb-6" style={{ background: "rgba(52,211,153,0.1)" }} />
+
+        {/* Bottom row */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/25">
+          <p>
+            © 2026{" "}
+            <span className="font-bold text-emerald-400/60">REKLE</span>
+            . Bangun kebiasaan ramah lingkungan.
+          </p>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Semua sistem berjalan normal</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ─── Root Layout ───────────────────────────────────────────────
 
 function Layout() {
   const location = useLocation();
@@ -161,7 +216,7 @@ function Layout() {
           {/* Action hub */}
           <Route path="/action" element={<ProtectedRoute><ActionPage /></ProtectedRoute>} />
 
-          {/* Action pages — semua action types */}
+          {/* Action pages */}
           <Route path="/action/reuse"       element={<ProtectedRoute><ReusePage /></ProtectedRoute>} />
           <Route path="/action/recycle"     element={<ProtectedRoute><RecyclePage /></ProtectedRoute>} />
           <Route path="/action/bank-sampah" element={<ProtectedRoute><BankSampahPage /></ProtectedRoute>} />
@@ -172,7 +227,7 @@ function Layout() {
           {/* ── ADMIN (protected) ───────────────────── */}
           <Route path="/admin/dashboard"        element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
           <Route path="/admin/konfirmasi"        element={<AdminRoute><AdminLayout><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/verifikasi-mitra"  element={<AdminRoute><AdminLayout><VerifikasiMitra /></AdminLayout></AdminRoute>} /> {/* ← ditambahkan */}
+          <Route path="/admin/verifikasi-mitra"  element={<AdminRoute><AdminLayout><VerifikasiMitra /></AdminLayout></AdminRoute>} />
           <Route path="/admin/user"              element={<AdminRoute><AdminLayout><UserManagement /></AdminLayout></AdminRoute>} />
           <Route path="/admin/partners"          element={<AdminRoute><AdminLayout><DataMitra /></AdminLayout></AdminRoute>} />
           <Route path="/admin/waste-data"        element={<AdminRoute><AdminLayout><DataSampah /></AdminLayout></AdminRoute>} />
@@ -195,15 +250,7 @@ function Layout() {
       </main>
 
       {/* FOOTER */}
-      {!hideLayout && !isAdminPage && !isMitraPage && (
-        <footer className="text-center py-6 border-t bg-white">
-          <p className="text-sm text-gray-400">
-            © 2026{" "}
-            <span className="font-semibold text-green-800">REKLE</span>
-            . Bangun kebiasaan ramah lingkungan.
-          </p>
-        </footer>
-      )}
+      {!hideLayout && !isAdminPage && !isMitraPage && <Footer />}
     </div>
   );
 }

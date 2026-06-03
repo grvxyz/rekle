@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "@/components/ui/button";
+import GuestClaimBlock from "@/components/scan/GuestClaimBlock";
 import {
   Recycle,
   Palette,
@@ -17,7 +18,7 @@ import {
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 // Menerima props dari ScanPage — BUKAN dari location.state
-const ScanResult = ({ image, result, resetScan }) => {
+const ScanResult = ({ image, result, resetScan, isGuest }) => {
   const navigate = useNavigate();
   const [showAllIdeas, setShowAllIdeas] = useState(false);
 
@@ -46,13 +47,13 @@ const ScanResult = ({ image, result, resetScan }) => {
   const handleLanjutAksi = () => {
     navigate("/action", {
       state: {
-        result:        result?.result || null,   // ← fix: hapus result?.category yang salah
+        result:        result?.result || null,
         prediction_id: result?.prediction_id ?? null,
       },
     });
   };
 
-  // Ide upcycling dari API — sudah ada di response sejak kita fix scan.py
+  // Ide upcycling dari API
   const ideas = result?.upcycle_ideas || [];
   const visibleIdeas = showAllIdeas ? ideas : ideas.slice(0, 4);
 
@@ -268,12 +269,21 @@ const ScanResult = ({ image, result, resetScan }) => {
 
       {/* BUTTONS */}
       <div className="flex flex-col md:flex-row gap-4">
-        <Button
-          className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-          onClick={handleLanjutAksi}
-        >
-          Lanjutkan ke Aksi
-        </Button>
+        {isGuest ? (
+          <div className="flex-1">
+            <GuestClaimBlock
+              pointsAvailable={result?.points ?? null}
+              message="Login untuk mengklaim poin dari hasil scan ini dan melanjutkan ke aksi."
+            />
+          </div>
+        ) : (
+          <Button
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+            onClick={handleLanjutAksi}
+          >
+            Lanjutkan ke Aksi
+          </Button>
+        )}
         <Button variant="outline" onClick={resetScan}>
           Scan Lagi
         </Button>
