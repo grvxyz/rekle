@@ -1,362 +1,353 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import api from "@/lib/axios";
-import dayjs from "dayjs";
 
-// ======================================================
-// LABEL & BADGE HELPERS
-// ======================================================
+import ActionCard from "@/components/admin/konfirmasi/ActionCard";
+import ActionDetailModal from "@/components/admin/konfirmasi/ActionDetailModal";
+import SkeletonCards from "@/components/admin/konfirmasi/SkeletonCards";
 
-const ACTION_TYPE_LABEL = {
-  kompos: "Kompos",
-  bank_sampah: "Bank Sampah",
-  daur_ulang: "Daur Ulang",
-  eco_brick: "Eco Brick",
-  reuse: "Reuse",
-  khusus: "Penanganan Khusus",
-};
-
-const STATUS_CONFIG = {
-  pending: {
-    label: "Menunggu",
-    className: "bg-yellow-100 text-yellow-700",
-  },
-  confirmed: {
-    label: "Dikonfirmasi",
-    className: "bg-green-100 text-green-700",
-  },
-  rejected: {
-    label: "Ditolak",
-    className: "bg-red-100 text-red-600",
-  },
-};
-
-// ======================================================
-// PAGE
-// ======================================================
+// ─── Interval auto-refresh (ms) ──────────────────────────────
+const REFRESH_INTERVAL = 15_000; // 15 detik
 
 const KonfirmasiAksi = () => {
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [actionLoading, setActionLoading] = useState(null);
 
-  // ======================================================
-  // FETCH PENDING ACTIONS
-  // ======================================================
+  // Auto-refresh state
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [countdown, setCountdown] = useState(REFRESH_INTERVAL / 1000);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const intervalRef = useRef(null);
+  const countdownRef = useRef(null);
 
-  const fetchActions = useCallback(async () => {
+  // Modal konfirmasi (approve/reject)
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, actionId: null });
+  const [rejectReason, setRejectReason] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Modal detail aksi
+  const [detailAction, setDetailAction] = useState(null);
+
+  // ─── Fetch data ──────────────────────────────────────────
+  const fetchActions = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
+      else setIsRefreshing(true);
+
       setError("");
-
-      // BACKEND BARU
-      // GET /api/v1/actions/pending
-
       const { data } = await api.get("/actions/pending");
 
-      console.log("Pending actions:", data);
+      if (Array.isArray(data)) setActions(data);
+      else if (Array.isArray(data.actions)) setActions(data.actions);
+      else setActions([]);
 
-      // support array langsung / object
-      if (Array.isArray(data)) {
-        setActions(data);
-      } else if (Array.isArray(data.actions)) {
-        setActions(data.actions);
-      } else {
-        setActions([]);
-      }
-
+      setLastRefreshed(new Date());
     } catch (err) {
-      console.error("Fetch actions error:", err);
-
-      if (err.response?.status === 401) {
-        setError("Silakan login terlebih dahulu");
-      } else if (err.response?.status === 403) {
-        setError("Akses admin ditolak");
-      } else {
-        setError("Gagal mengambil data aksi");
+      // 401 sudah ditangani interceptor (auto-refresh / force logout)
+      // hanya tampilkan error jika bukan silent refresh
+      if (!silent) {
+        if (err.response?.status === 403) setError("Akses ditolak — halaman ini khusus admin.");
+        else if (err.response?.status >= 500) setError("Server error, coba beberapa saat lagi.");
+        else if (err.code === "ERR_NETWORK") setError("Tidak dapat terhubung ke server.");
+        else if (err.response?.status !== 401) setError("Gagal mengambil data aksi.");
+        // 401 → diam saja, interceptor sudah redirect ke /login
       }
-
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      else setIsRefreshing(false);
     }
+  }, []);
+
+  // ─── Auto-refresh setup ───────────────────────────────────
+  const resetCountdown = useCallback(() => {
+    setCountdown(REFRESH_INTERVAL / 1000);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => (c <= 1 ? REFRESH_INTERVAL / 1000 : c - 1));
+    }, 1000);
   }, []);
 
   useEffect(() => {
     fetchActions();
-  }, [fetchActions]);
 
-  // ======================================================
-  // VERIFY ACTION
-  // ======================================================
+    // Setup auto-refresh interval
+    intervalRef.current = setInterval(() => {
+      fetchActions(true); // silent refresh
+      resetCountdown();
+    }, REFRESH_INTERVAL);
 
-  const updateStatus = async (actionId, newStatus) => {
-    const isApprove = newStatus === "confirmed";
+    resetCountdown();
 
-    const label = isApprove
-      ? "mengonfirmasi"
-      : "menolak";
+    return () => {
+      clearInterval(intervalRef.current);
+      clearInterval(countdownRef.current);
+    };
+  }, [fetchActions, resetCountdown]);
 
-    const confirmed = window.confirm(
-      `Yakin ingin ${label} aksi ini?`
-    );
+  // Manual refresh
+  const handleManualRefresh = () => {
+    fetchActions(true);
+    resetCountdown();
+  };
 
-    if (!confirmed) return;
+  // ─── Modal konfirmasi ─────────────────────────────────────
+  const openModal = (type, actionId) => {
+    setModalConfig({ isOpen: true, type, actionId });
+    setRejectReason("");
+  };
+
+  const closeModal = () => {
+    if (isProcessing) return;
+    setModalConfig({ isOpen: false, type: null, actionId: null });
+    setRejectReason("");
+  };
+
+  const handleProcessAction = async () => {
+    const { type, actionId } = modalConfig;
+
+    if (type === "reject" && !rejectReason.trim()) {
+      alert("Alasan penolakan tidak boleh kosong.");
+      return;
+    }
 
     try {
-      setActionLoading(actionId);
+      setIsProcessing(true);
+      const payload =
+        type === "approve"
+          ? { status: "approved" }
+          : { status: "rejected", rejection_reason: rejectReason.trim() };
 
-      // PATCH /api/v1/actions/{id}/verify
+      await api.patch(`/actions/${actionId}/verify`, payload);
 
-      await api.patch(
-        `/actions/${actionId}/verify`,
-        {
-          status: newStatus,
-        }
-      );
+      // Hapus dari list setelah berhasil
+      setActions((prev) => prev.filter((a) => a.id !== actionId));
 
-      // Hapus dari list setelah diproses
-      setActions((prev) =>
-        prev.filter((a) => a.id !== actionId)
-      );
+      // Tutup juga modal detail jika sedang terbuka untuk action yang sama
+      if (detailAction?.id === actionId) setDetailAction(null);
 
+      closeModal();
     } catch (err) {
-      console.error("Verify action error:", err);
-
-      // Jika backend ternyata memakai field lain
-      if (err.response?.status === 422) {
-        alert(
-          "Request verify tidak sesuai schema backend"
-        );
-      } else {
-        alert(`Gagal ${label} aksi`);
-      }
-
+      const detail = err.response?.data?.detail;
+      alert(detail || `Gagal ${type === "approve" ? "menyetujui" : "menolak"} aksi`);
     } finally {
-      setActionLoading(null);
+      setIsProcessing(false);
     }
   };
 
-  // ======================================================
-  // RENDER
-  // ======================================================
+  // ─── Buka modal detail dari dalam modal konfirmasi ────────
+  const openConfirmFromDetail = (type) => {
+    if (!detailAction) return;
+    openModal(type, detailAction.id);
+  };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
 
-      {/* HEADER */}
-      <div className="flex items-center justify-between">
+      {/* ─── HEADER ─────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
             Konfirmasi Aksi
           </h1>
-
-          <p className="text-sm text-gray-500 mt-1">
-            Tinjau dan verifikasi aksi pengguna
+          <p className="text-sm text-gray-500 mt-1.5 font-medium">
+            Tinjau dan verifikasi aktivitas pengguna yang menunggu persetujuan.
           </p>
         </div>
 
-        <button
-          onClick={fetchActions}
-          className="px-4 py-2 rounded-xl bg-black text-white hover:bg-gray-800 transition"
-        >
-          Refresh
-        </button>
+        {/* Kanan: badge count + auto-refresh indicator */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {!loading && (
+            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full border border-emerald-100 font-semibold text-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {actions.length} Menunggu
+            </div>
+          )}
+
+          {/* Auto-refresh info */}
+          <div className="inline-flex items-center gap-2 bg-slate-50 text-slate-500 px-4 py-2 rounded-full border border-slate-100 text-sm font-medium">
+            {isRefreshing ? (
+              <>
+                <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Memperbarui...
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                Refresh dalam {countdown}dtk
+              </>
+            )}
+            <button
+              onClick={handleManualRefresh}
+              className="ml-1 text-slate-400 hover:text-slate-700 transition-colors"
+              title="Refresh sekarang"
+            >
+              ↺
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* ERROR */}
+      {/* Timestamp terakhir refresh */}
+      {lastRefreshed && (
+        <p className="text-[11px] text-gray-400 -mt-3">
+          Terakhir diperbarui: {lastRefreshed.toLocaleTimeString("id-ID")}
+        </p>
+      )}
+
+      {/* ─── ERROR ──────────────────────────────────────── */}
       {error && (
-        <div className="bg-red-100 text-red-600 p-4 rounded-xl">
-          {error}
+        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-xl flex items-start gap-3">
+          <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="font-medium text-sm">{error}</p>
         </div>
       )}
 
-      {/* LOADING */}
+      {/* ─── CONTENT ─────────────────────────────────────── */}
       {loading ? (
-        <SkeletonCards count={5} />
-      ) : actions.length === 0 ? (
-
-        <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
-          Tidak ada aksi yang menunggu konfirmasi
-        </div>
-
-      ) : (
-
         <div className="space-y-4">
+          <SkeletonCards count={5} />
+        </div>
+      ) : actions.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-dashed border-gray-200 p-16 flex flex-col items-center justify-center text-center">
+          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Semua aksi sudah tertinjau</h3>
+          <p className="text-sm text-gray-500">
+            Tidak ada aksi yang menunggu konfirmasi saat ini.
+          </p>
+          <button
+            onClick={handleManualRefresh}
+            className="mt-4 text-sm text-emerald-600 font-semibold hover:underline"
+          >
+            ↺ Cek lagi sekarang
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {actions.map((action) => (
             <ActionCard
               key={action.id}
               action={action}
-              onConfirm={() =>
-                updateStatus(action.id, "confirmed")
-              }
-              onReject={() =>
-                updateStatus(action.id, "rejected")
-              }
-              isLoading={actionLoading === action.id}
+              onConfirm={() => openModal("approve", action.id)}
+              onReject={() => openModal("reject", action.id)}
+              onViewDetail={(a) => setDetailAction(a)}
+              isLoading={isProcessing && modalConfig.actionId === action.id}
             />
           ))}
         </div>
-
       )}
-    </div>
-  );
-};
 
-// ======================================================
-// ACTION CARD
-// ======================================================
+      {/* ─── MODAL DETAIL ─────────────────────────────── */}
+      {detailAction && (
+        <ActionDetailModal
+          action={detailAction}
+          onClose={() => setDetailAction(null)}
+          onConfirm={() => { openConfirmFromDetail("approve"); }}
+          onReject={() => { openConfirmFromDetail("reject"); }}
+        />
+      )}
 
-const ActionCard = ({
-  action,
-  onConfirm,
-  onReject,
-  isLoading,
-}) => {
+      {/* ─── MODAL KONFIRMASI/TOLAK ────────────────────── */}
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+            onClick={closeModal}
+          />
 
-  const statusCfg =
-    STATUS_CONFIG[action.status] ||
-    STATUS_CONFIG.pending;
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className={`p-6 border-b border-gray-100 flex items-center gap-4 ${
+              modalConfig.type === "approve" ? "bg-emerald-50/50" : "bg-red-50/50"
+            }`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+                modalConfig.type === "approve"
+                  ? "bg-emerald-100 text-emerald-600"
+                  : "bg-red-100 text-red-600"
+              }`}>
+                {modalConfig.type === "approve" ? (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {modalConfig.type === "approve" ? "Setujui Aksi?" : "Tolak Aksi?"}
+                </h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {modalConfig.type === "approve"
+                    ? "Pastikan bukti yang diunggah valid dan sesuai."
+                    : "Aksi yang ditolak tidak akan mendapatkan poin."}
+                </p>
+              </div>
+            </div>
 
-  return (
-    <div className="bg-white rounded-2xl shadow p-5 space-y-4">
-
-      {/* TOP */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-
-        <div className="space-y-2">
-
-          {/* TITLE */}
-          <div className="flex items-center gap-2 flex-wrap">
-
-            <h3 className="font-semibold text-gray-800">
-              {ACTION_TYPE_LABEL[action.action_type] ||
-                action.action_type}
-            </h3>
-
-            <span
-              className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusCfg.className}`}
-            >
-              {statusCfg.label}
-            </span>
-
-          </div>
-
-          {/* META */}
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-
-            <span>
-              👤{" "}
-              {action.user?.full_name ||
-                action.user?.email ||
-                `User #${action.user_id}`}
-            </span>
-
-            {action.partner_name && (
-              <span>
-                🏢 {action.partner_name}
-              </span>
+            {/* Body: input alasan tolak */}
+            {modalConfig.type === "reject" && (
+              <div className="p-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Alasan Penolakan <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Contoh: Foto buram atau sampah tidak sesuai kategori..."
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none bg-gray-50/50"
+                  autoFocus
+                />
+              </div>
             )}
 
-            <span>
-              🕒{" "}
-              {dayjs(action.created_at).format(
-                "DD MMM YYYY, HH:mm"
-              )}
-            </span>
-
-            <span className="font-medium text-green-700">
-              +{action.points_earned} poin
-            </span>
-
+            {/* Footer */}
+            <div className="p-6 pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleProcessAction}
+                disabled={isProcessing}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 ${
+                  modalConfig.type === "approve"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {isProcessing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Memproses...
+                  </>
+                ) : modalConfig.type === "approve" ? "Ya, Setujui" : "Tolak Aksi"}
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* PREDICTION */}
-        {action.prediction_id && (
-          <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
-            Scan #{action.prediction_id}
-          </span>
-        )}
-      </div>
-
-      {/* NOTES */}
-      {action.notes && (
-        <div className="bg-gray-50 rounded-xl p-3 text-sm italic text-gray-700">
-          "{action.notes}"
-        </div>
-      )}
-
-      {/* PROOF IMAGE */}
-      {action.proof_image_path && (
-        <div>
-          <img
-            src={action.proof_image_path}
-            alt="Proof"
-            className="rounded-xl max-h-72 object-cover border"
-          />
-        </div>
-      )}
-
-      {/* BUTTONS */}
-      {action.status === "pending" && (
-        <div className="flex gap-3 pt-2">
-
-          <button
-            onClick={onConfirm}
-            disabled={isLoading}
-            className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
-          >
-            {isLoading
-              ? "Memproses..."
-              : "✓ Konfirmasi"}
-          </button>
-
-          <button
-            onClick={onReject}
-            disabled={isLoading}
-            className="flex-1 py-2 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-100 transition disabled:opacity-50"
-          >
-            {isLoading
-              ? "Memproses..."
-              : "✕ Tolak"}
-          </button>
-
         </div>
       )}
     </div>
   );
 };
-
-// ======================================================
-// SKELETON
-// ======================================================
-
-const SkeletonCards = ({ count = 5 }) => (
-  <div className="space-y-4 animate-pulse">
-
-    {[...Array(count)].map((_, i) => (
-      <div
-        key={i}
-        className="bg-white rounded-2xl shadow p-5 space-y-3"
-      >
-
-        <div className="h-5 w-48 bg-gray-200 rounded" />
-
-        <div className="h-4 w-72 bg-gray-200 rounded" />
-
-        <div className="h-24 bg-gray-200 rounded-xl" />
-
-        <div className="flex gap-3">
-
-          <div className="h-10 flex-1 bg-gray-200 rounded-xl" />
-
-          <div className="h-10 flex-1 bg-gray-200 rounded-xl" />
-
-        </div>
-      </div>
-    ))}
-
-  </div>
-);
 
 export default KonfirmasiAksi;

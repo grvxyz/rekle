@@ -13,7 +13,7 @@ function ActivityChart({ data }) {
   const chartData = Array.isArray(data) ? data : [];
 
   return (
-    <Card>
+    <Card className="h-full border-0 shadow-sm">
       <CardContent className="p-5">
 
         <SectionHeader
@@ -22,7 +22,7 @@ function ActivityChart({ data }) {
         />
 
         <div className="h-64 mt-4">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData}>
               <XAxis dataKey="date" />
               <YAxis />

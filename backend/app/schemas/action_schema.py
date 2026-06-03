@@ -20,20 +20,33 @@ class ActionVerifySchema(BaseModel):
     weight_gram: Optional[int] = None       # diisi jika route = "mitra" + approved
 
 
+# ─── Embed minimal data user ────────────────────────────────
+class UserMinimal(BaseModel):
+    id: int
+    full_name: Optional[str] = None
+    email: str
+    avatar_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 # ─── Response ──────────────────────────────────────────────
 class ActionResponse(BaseModel):
     id: int
+    user_id: int
+    user: Optional[UserMinimal] = None      # ← embed data user, diisi saat joinedload
     action_type: str
-    route: Optional[str]
-    partner_name: Optional[str]
-    notes: Optional[str]
-    proof_image_path: Optional[str]
+    route: Optional[str] = None
+    partner_name: Optional[str] = None
+    notes: Optional[str] = None
+    proof_image_path: Optional[str] = None
     points_earned: int
     balance_earned: int
+    weight_gram: Optional[int] = None
     status: str
-    rejection_reason: Optional[str]         # ditampilkan ke user jika rejected
-    verified_by: Optional[int]
-    verified_at: Optional[datetime]
+    rejection_reason: Optional[str] = None
+    verified_by: Optional[int] = None
+    verified_at: Optional[datetime] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

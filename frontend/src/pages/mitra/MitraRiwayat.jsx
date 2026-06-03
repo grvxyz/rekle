@@ -11,26 +11,33 @@ const ACTION_TYPE_LABEL = {
   khusus:      "Penanganan Khusus",
 };
 
-// FIX: status backend adalah "approved", bukan "confirmed"
 const STATUS_CONFIG = {
-  pending:  { label: "Pending",        Icon: Clock,         cls: "bg-amber-100 text-amber-700" },
-  approved: { label: "Dikonfirmasi",   Icon: CheckCircle,   cls: "bg-green-100 text-green-700" },
-  rejected: { label: "Ditolak",        Icon: XCircle,       cls: "bg-red-100 text-red-600"     },
+  pending:  { label: "Pending",       Icon: Clock,       cls: "bg-amber-100 text-amber-700" },
+  approved: { label: "Dikonfirmasi",  Icon: CheckCircle, cls: "bg-green-100 text-green-700" },
+  rejected: { label: "Ditolak",       Icon: XCircle,     cls: "bg-red-100 text-red-600"     },
+};
+
+/**
+ * Konversi weight_gram (integer dari backend) → tampilan kg/g.
+ * Contoh: 1500 → "1.5 kg" | 500 → "500 g" | null → null
+ */
+const formatWeight = (gram) => {
+  if (!gram) return null;
+  if (gram >= 1000) return `${(gram / 1000).toFixed(gram % 1000 === 0 ? 0 : 1)} kg`;
+  return `${gram} g`;
 };
 
 const MitraRiwayat = () => {
   const [actions,  setActions]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
-  const [filter,   setFilter]   = useState("all"); // all | approved | rejected | pending
+  const [filter,   setFilter]   = useState("all");
   const [selected, setSelected] = useState(null);
 
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      // FIX: gunakan /mitra/mine/actions — semua riwayat aksi mitra milik user ini
-      // Sebelumnya salah pakai /actions/pending yang: (1) hanya pending, (2) khusus superuser
       const { data } = await api.get("/mitra/mine/actions");
       const list = Array.isArray(data) ? data : [];
       setActions(list);
@@ -59,6 +66,7 @@ const MitraRiwayat = () => {
     const proofUrl = action.proof_url || action.proof_image_path;
     const statusCfg = STATUS_CONFIG[action.status] || STATUS_CONFIG.pending;
     const { Icon } = statusCfg;
+    const weightDisplay = formatWeight(action.weight_gram);
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -89,10 +97,10 @@ const MitraRiwayat = () => {
                   <span className="font-medium text-gray-900 capitalize">{action.route}</span>
                 </div>
               )}
-              {action.weight_kg && (
+              {weightDisplay && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Berat</span>
-                  <span className="font-medium text-gray-900">{action.weight_kg} kg</span>
+                  <span className="font-medium text-gray-900">{weightDisplay}</span>
                 </div>
               )}
               <div className="flex justify-between">
@@ -105,6 +113,28 @@ const MitraRiwayat = () => {
                     : "-"}
                 </span>
               </div>
+              {action.balance_earned > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Saldo Didapat</span>
+                  <span className="font-medium text-green-700">
+                    Rp {action.balance_earned.toLocaleString("id-ID")}
+                  </span>
+                </div>
+              )}
+              {action.points_earned > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Poin Didapat</span>
+                  <span className="font-medium text-amber-700">
+                    +{action.points_earned} poin
+                  </span>
+                </div>
+              )}
+              {action.rejection_reason && (
+                <div className="pt-2 border-t">
+                  <p className="text-gray-500 mb-1">Alasan Penolakan</p>
+                  <p className="text-red-600">{action.rejection_reason}</p>
+                </div>
+              )}
               {action.notes && (
                 <div className="pt-2 border-t">
                   <p className="text-gray-500 mb-1">Catatan</p>
@@ -124,8 +154,10 @@ const MitraRiwayat = () => {
           </div>
 
           <div className="px-6 py-4 border-t">
-            <button onClick={onClose}
-              className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition"
+            >
               Tutup
             </button>
           </div>
@@ -155,17 +187,17 @@ const MitraRiwayat = () => {
       {/* Filter Tabs */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: "all",      label: "Semua",        color: "gray"  },
-          { key: "pending",  label: "Pending",       color: "amber" },
-          { key: "approved", label: "Dikonfirmasi",  color: "green" },
-          { key: "rejected", label: "Ditolak",       color: "red"   },
+          { key: "all",      label: "Semua",       color: "gray"  },
+          { key: "pending",  label: "Pending",      color: "amber" },
+          { key: "approved", label: "Dikonfirmasi", color: "green" },
+          { key: "rejected", label: "Ditolak",      color: "red"   },
         ].map((tab) => {
           const active = filter === tab.key;
           const colorMap = {
-            gray:  active ? "bg-gray-800 text-white"   : "bg-gray-100 text-gray-600 hover:bg-gray-200",
-            amber: active ? "bg-amber-500 text-white"  : "bg-amber-50 text-amber-700 hover:bg-amber-100",
-            green: active ? "bg-green-600 text-white"  : "bg-green-50 text-green-700 hover:bg-green-100",
-            red:   active ? "bg-red-500 text-white"    : "bg-red-50 text-red-600 hover:bg-red-100",
+            gray:  active ? "bg-gray-800 text-white"  : "bg-gray-100 text-gray-600 hover:bg-gray-200",
+            amber: active ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 hover:bg-amber-100",
+            green: active ? "bg-green-600 text-white" : "bg-green-50 text-green-700 hover:bg-green-100",
+            red:   active ? "bg-red-500 text-white"   : "bg-red-50 text-red-600 hover:bg-red-100",
           };
           return (
             <button
@@ -206,6 +238,7 @@ const MitraRiwayat = () => {
             {filtered.map((action) => {
               const statusCfg = STATUS_CONFIG[action.status] || STATUS_CONFIG.pending;
               const { Icon } = statusCfg;
+              const weightDisplay = formatWeight(action.weight_gram);
 
               return (
                 <button
@@ -228,7 +261,7 @@ const MitraRiwayat = () => {
                             day: "numeric", month: "short", year: "numeric",
                           })
                         : "-"}
-                      {action.weight_kg && ` · ${action.weight_kg} kg`}
+                      {weightDisplay && ` · ${weightDisplay}`}
                     </p>
                   </div>
 

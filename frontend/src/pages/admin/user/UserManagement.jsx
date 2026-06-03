@@ -26,68 +26,44 @@ const UserManagement = () => {
   // FETCH USERS
   // ======================================================
 
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
+const fetchUsers = useCallback(async () => {
+  try {
+    setLoading(true);
+    setError("");
 
-      // BACKEND:
-      // GET /api/v1/admin/users
+    const skip = (page - 1) * LIMIT;
 
-      const { data } = await api.get(
-        "/admin/users",
-        {
-          params: {
-            search: search || undefined,
-            page,
-            limit: LIMIT,
-          },
-        }
-      );
+    const { data } = await api.get("/admin/users", {
+      params: {
+        skip,
+        limit: LIMIT,
+        search: search || undefined,
+      },
+    });
 
-      console.log("Users:", data);
-
-      // support:
-      // { users: [] }
-      // atau langsung []
-
-      if (Array.isArray(data)) {
-        setUsers(data);
-        setTotalPages(1);
-
-      } else {
-        setUsers(
-          Array.isArray(data.users)
-            ? data.users
-            : []
-        );
-
-        setTotalPages(
-          Math.ceil((data.total || 1) / LIMIT)
-        );
-      }
-
-    } catch (err) {
-      console.error("Fetch users error:", err);
-
-      if (err.response?.status === 401) {
-        setError(
-          "Silakan login terlebih dahulu"
-        );
-
-      } else if (err.response?.status === 403) {
-        setError("Akses admin ditolak");
-
-      } else {
-        setError(
-          "Gagal mengambil data pengguna"
-        );
-      }
-
-    } finally {
-      setLoading(false);
+    if (Array.isArray(data)) {
+      setUsers(data);
+      setTotalPages(1);
+    } else {
+      setUsers(Array.isArray(data.users) ? data.users : []);
+      setTotalPages(Math.ceil((data.total || 1) / LIMIT));
     }
-  }, [search, page]);
+
+  } catch (err) {
+    console.error("Fetch users error:", err);
+
+    if (err.response?.status === 401) {
+      setError("Silakan login terlebih dahulu");
+    } else if (err.response?.status === 403) {
+      setError("Akses admin ditolak");
+    } else {
+      setError("Gagal mengambil data pengguna");
+    }
+
+  } finally {
+    setLoading(false);
+  }
+}, [search, page]);
 
   // ======================================================
   // EFFECTS
@@ -225,13 +201,6 @@ const UserManagement = () => {
             Kelola pengguna dan hak akses admin
           </p>
         </div>
-
-        <button
-          onClick={fetchUsers}
-          className="px-4 py-2 rounded-xl bg-black text-white hover:bg-gray-800 transition"
-        >
-          Refresh
-        </button>
 
       </div>
 

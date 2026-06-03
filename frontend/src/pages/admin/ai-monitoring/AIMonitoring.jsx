@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Brain, TrendingUp, AlertTriangle, Flag, RefreshCw } from "lucide-react";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,7 +12,7 @@ import {
 import api from "@/lib/axios";
 import dayjs from "dayjs";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────
 
 function pct(v) {
   if (v == null) return "–";
@@ -20,73 +20,48 @@ function pct(v) {
   return `${n.toFixed(1)}%`;
 }
 
-function confidenceColor(v) {
-  if (v == null) return "#9ca3af";
-  const n = v > 1 ? v / 100 : v;
-  if (n >= 0.9) return "#16a34a";
-  if (n >= 0.75) return "#65a30d";
-  if (n >= 0.6) return "#ca8a04";
-  return "#dc2626";
-}
-
 function confidenceTextColor(v) {
   if (v == null) return "#6b7280";
   const n = v > 1 ? v / 100 : v;
-  if (n >= 0.9) return "#15803d";
+  if (n >= 0.9)  return "#15803d";
   if (n >= 0.75) return "#4d7c0f";
-  if (n >= 0.6) return "#92400e";
+  if (n >= 0.6)  return "#92400e";
   return "#b91c1c";
 }
 
 function CategoryBadge({ label }) {
   const map = {
-    Medical: { bg: "#fef9c3", color: "#854d0e", border: "#fde047" },
-    organik: { bg: "#d1fae5", color: "#065f46", border: "#6ee7b7" },
-    plastik_pet: { bg: "#dbeafe", color: "#1e3a8a", border: "#93c5fd" },
-    plastik_hdpe: { bg: "#dbeafe", color: "#1e3a8a", border: "#93c5fd" },
+    organik:          { bg: "#d1fae5", color: "#065f46", border: "#6ee7b7" },
+    plastik_pet:      { bg: "#dbeafe", color: "#1e3a8a", border: "#93c5fd" },
+    plastik_hdpe:     { bg: "#dbeafe", color: "#1e3a8a", border: "#93c5fd" },
     plastik_campuran: { bg: "#dbeafe", color: "#1e3a8a", border: "#93c5fd" },
-    kertas_bersih: { bg: "#fef9c3", color: "#713f12", border: "#fde047" },
-    kertas_kotor: { bg: "#ffedd5", color: "#7c2d12", border: "#fdba74" },
-    kaca_utuh: { bg: "#cffafe", color: "#164e63", border: "#67e8f9" },
-    kaca_pecah: { bg: "#fee2e2", color: "#7f1d1d", border: "#fca5a5" },
+    kertas_bersih:    { bg: "#fef9c3", color: "#713f12", border: "#fde047" },
+    kertas_kotor:     { bg: "#ffedd5", color: "#7c2d12", border: "#fdba74" },
+    kaca_utuh:        { bg: "#cffafe", color: "#164e63", border: "#67e8f9" },
+    kaca_pecah:       { bg: "#fee2e2", color: "#7f1d1d", border: "#fca5a5" },
   };
   const cfg = map[label] || { bg: "#f3f4f6", color: "#374151", border: "#d1d5db" };
   return (
-    <span
-      style={{
-        background: cfg.bg,
-        color: cfg.color,
-        border: `1px solid ${cfg.border}`,
-        fontSize: 11,
-        fontWeight: 500,
-        padding: "2px 8px",
-        borderRadius: 999,
-        whiteSpace: "nowrap",
-      }}
-    >
+    <span style={{
+      background: cfg.bg, color: cfg.color,
+      border: `1px solid ${cfg.border}`,
+      fontSize: 11, fontWeight: 500,
+      padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap",
+    }}>
       {label}
     </span>
   );
 }
 
-// ── stat card ─────────────────────────────────────────────────────────────────
+// ── stat card ─────────────────────────────────────────────
 
 function StatCard({ icon: Icon, title, value, sub, subColor }) {
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 16,
-        padding: "20px 24px",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 16,
-        flex: 1,
-        minWidth: 0,
-      }}
-    >
+    <div style={{
+      background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16,
+      padding: "20px 24px", display: "flex", alignItems: "flex-start",
+      justifyContent: "space-between", gap: 16, flex: 1, minWidth: 0,
+    }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: 14, color: "#6b7280" }}>{title}</p>
         <p style={{ margin: "6px 0 4px", fontSize: 32, fontWeight: 700, color: "#111827", lineHeight: 1 }}>
@@ -98,50 +73,38 @@ function StatCard({ icon: Icon, title, value, sub, subColor }) {
           </p>
         )}
       </div>
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 12,
-          background: "#f0fdf4",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
+      <div style={{
+        width: 44, height: 44, borderRadius: 12, background: "#f0fdf4",
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      }}>
         <Icon size={20} color="#16a34a" />
       </div>
     </div>
   );
 }
 
-// ── skeleton ──────────────────────────────────────────────────────────────────
+// ── skeleton ──────────────────────────────────────────────
 
 function Skeleton({ w = "100%", h = 16, r = 8 }) {
   return (
-    <div
-      style={{
-        width: w,
-        height: h,
-        borderRadius: r,
-        background: "#f3f4f6",
-        animation: "pulse 1.5s ease-in-out infinite",
-      }}
-    />
+    <div style={{
+      width: w, height: h, borderRadius: r,
+      background: "#f3f4f6",
+      animation: "pulse 1.5s ease-in-out infinite",
+    }} />
   );
 }
 
-// ── main ──────────────────────────────────────────────────────────────────────
+// ── main ──────────────────────────────────────────────────
 
-const THRESHOLD = 0.9;
+const THRESHOLD = 0.7; // sesuai notebook: confidence_threshold = 0.7
 
 const AIMonitoring = () => {
-  const [scans, setScans] = useState([]);
-  const [timeseries, setTimeseries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [flagged, setFlagged] = useState(new Set());
+  const [scans,     setScans]     = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState("");
+  const [flagged,   setFlagged]   = useState(new Set());
 
   const fetchData = useCallback(async () => {
     try {
@@ -149,31 +112,34 @@ const AIMonitoring = () => {
       setError("");
 
       const [scanRes, tsRes] = await Promise.all([
-        api.get("/scan/history", { params: { skip: 0, limit: 200 } }),
+        // FIX: pakai /admin/scans bukan /scan/history
+        // /scan/history hanya return scan milik admin sendiri
+        api.get("/admin/scans", { params: { skip: 0, limit: 200 } }),
         api.get("/admin/analytics/timeseries", {
           params: {
             start_date: dayjs().subtract(13, "day").format("YYYY-MM-DD"),
-            end_date: dayjs().format("YYYY-MM-DD"),
+            end_date:   dayjs().format("YYYY-MM-DD"),
           },
         }),
       ]);
 
+      // Response: { total, items: [...] }
       const items = Array.isArray(scanRes.data)
         ? scanRes.data
         : scanRes.data?.items || [];
       setScans(items);
 
+      // Timeseries dari backend: [{ date, count }]
+      // Backend tidak punya avg_confidence per hari, jadi chart
+      // menampilkan jumlah scan per hari (bukan accuracy)
       const ts = Array.isArray(tsRes.data)
         ? tsRes.data.map((d) => ({
-            date: dayjs(d.date).format("D"),
-            accuracy: d.avg_confidence != null
-              ? parseFloat((d.avg_confidence * 100).toFixed(1))
-              : d.accuracy != null
-              ? parseFloat(d.accuracy.toFixed(1))
-              : null,
+            date:  dayjs(d.date).format("D MMM"),
+            count: d.count || 0,
           }))
         : [];
-      setTimeseries(ts);
+      setChartData(ts);
+
     } catch (err) {
       console.error(err);
       setError("Gagal mengambil data monitoring AI.");
@@ -186,32 +152,17 @@ const AIMonitoring = () => {
 
   // derived stats
   const withConf = scans.filter((s) => s.confidence != null);
-  const avgConf = withConf.length
+  const avgConf  = withConf.length
     ? withConf.reduce((a, s) => a + s.confidence, 0) / withConf.length
     : null;
-  const avgAcc = avgConf; // treat confidence as accuracy proxy
+
+  const confidentScans    = scans.filter((s) => s.is_confident === true);
+  const notConfidentScans = scans.filter((s) => s.is_confident === false);
+
+  // Scan dengan confidence di bawah threshold
   const lowConf = scans.filter(
     (s) => s.confidence != null && s.confidence < THRESHOLD
   );
-
-  const chartData = timeseries.length
-    ? timeseries
-    : [
-        { date: "25", accuracy: 92.6 },
-        { date: "26", accuracy: 92.9 },
-        { date: "27", accuracy: 93.1 },
-        { date: "28", accuracy: 93.4 },
-        { date: "29", accuracy: 93.1 },
-        { date: "30", accuracy: 93.5 },
-        { date: "31", accuracy: 93.8 },
-        { date: "1",  accuracy: 93.7 },
-        { date: "2",  accuracy: 93.9 },
-        { date: "3",  accuracy: 94.1 },
-        { date: "4",  accuracy: 93.8 },
-        { date: "5",  accuracy: 94.0 },
-        { date: "6",  accuracy: 94.3 },
-        { date: "7",  accuracy: 94.2 },
-      ];
 
   const handleFlag = (id) => {
     setFlagged((prev) => {
@@ -228,29 +179,25 @@ const AIMonitoring = () => {
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
 
         {/* header */}
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div style={{
+          marginBottom: 24, display: "flex", alignItems: "flex-start",
+          justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+        }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#111827" }}>
               AI Model Monitoring
             </h1>
             <p style={{ margin: "4px 0 0", fontSize: 14, color: "#6b7280" }}>
-              Track AI performance and prediction accuracy
+              Monitor performa AI dan hasil prediksi klasifikasi sampah
             </p>
           </div>
           <button
             onClick={fetchData}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 16px",
-              borderRadius: 10,
-              border: "1px solid #d1d5db",
-              background: "#fff",
-              fontSize: 13,
-              color: "#374151",
-              cursor: "pointer",
-              fontWeight: 500,
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 16px", borderRadius: 10,
+              border: "1px solid #d1d5db", background: "#fff",
+              fontSize: 13, color: "#374151", cursor: "pointer", fontWeight: 500,
             }}
           >
             <RefreshCw size={14} />
@@ -260,7 +207,10 @@ const AIMonitoring = () => {
 
         {/* error */}
         {error && (
-          <div style={{ background: "#fee2e2", color: "#7f1d1d", padding: "12px 16px", borderRadius: 12, marginBottom: 20, fontSize: 14 }}>
+          <div style={{
+            background: "#fee2e2", color: "#7f1d1d",
+            padding: "12px 16px", borderRadius: 12, marginBottom: 20, fontSize: 14,
+          }}>
             {error}
           </div>
         )}
@@ -269,7 +219,10 @@ const AIMonitoring = () => {
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
           {loading ? (
             [0, 1, 2].map((i) => (
-              <div key={i} style={{ flex: 1, minWidth: 200, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 24px" }}>
+              <div key={i} style={{
+                flex: 1, minWidth: 200, background: "#fff",
+                border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 24px",
+              }}>
                 <Skeleton w="60%" h={14} />
                 <div style={{ marginTop: 10 }}><Skeleton w="45%" h={32} /></div>
                 <div style={{ marginTop: 8 }}><Skeleton w="55%" h={12} /></div>
@@ -279,19 +232,19 @@ const AIMonitoring = () => {
             <>
               <StatCard
                 icon={Brain}
-                title="Average Confidence"
+                title="Rata-rata Confidence"
                 value={pct(avgConf)}
-                sub="+2.3% from last month"
+                sub={`Dari ${withConf.length} scan`}
               />
               <StatCard
                 icon={TrendingUp}
-                title="Current Accuracy"
-                value={pct(avgAcc)}
-                sub="+2.1% from last month"
+                title="Scan Akurat (is_confident)"
+                value={confidentScans.length}
+                sub={`${scans.length > 0 ? ((confidentScans.length / scans.length) * 100).toFixed(1) : 0}% dari total scan`}
               />
               <StatCard
                 icon={AlertTriangle}
-                title="Low Confidence Scans"
+                title="Confidence Rendah"
                 value={lowConf.length}
                 sub={`Threshold: < ${THRESHOLD * 100}%`}
                 subColor="#dc2626"
@@ -300,16 +253,28 @@ const AIMonitoring = () => {
           )}
         </div>
 
-        {/* trend chart */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px", marginBottom: 24 }}>
-          <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 600, color: "#111827" }}>
-            Model Accuracy Trend
-          </h2>
+        {/* chart — scan per hari */}
+        <div style={{
+          background: "#fff", border: "1px solid #e5e7eb",
+          borderRadius: 16, padding: 24, marginBottom: 24,
+        }}>
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}>
+              Jumlah Scan per Hari (14 Hari Terakhir)
+            </h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9ca3af" }}>
+              Data dari backend — /admin/analytics/timeseries
+            </p>
+          </div>
           {loading ? (
             <Skeleton w="100%" h={220} r={12} />
+          ) : chartData.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af", fontSize: 14 }}>
+              Belum ada data scan dalam 14 hari terakhir
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chartData} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -318,34 +283,32 @@ const AIMonitoring = () => {
                   tickLine={false}
                 />
                 <YAxis
-                  domain={[90, 100]}
                   tick={{ fontSize: 12, fill: "#9ca3af" }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => v}
+                  allowDecimals={false}
                 />
                 <Tooltip
                   contentStyle={{ borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 13 }}
-                  formatter={(v) => [`${v}%`, "Accuracy"]}
+                  formatter={(v) => [v, "Jumlah Scan"]}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="accuracy"
-                  stroke="#16a34a"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: "#16a34a", strokeWidth: 0 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
+                <Bar dataKey="count" fill="#16a34a" radius={[6, 6, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* low confidence table */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6" }}>
+        <div style={{
+          background: "#fff", border: "1px solid #e5e7eb",
+          borderRadius: 16, overflow: "hidden",
+        }}>
+          <div style={{
+            padding: "20px 24px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", borderBottom: "1px solid #f3f4f6",
+          }}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}>
-              Low Confidence Predictions
+              Prediksi Confidence Rendah
             </h2>
             <span style={{ fontSize: 13, color: "#6b7280" }}>
               Threshold: &lt; {THRESHOLD * 100}%
@@ -356,50 +319,45 @@ const AIMonitoring = () => {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  {["Category", "Confidence", "User", "Timestamp", "Action"].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "12px 20px",
-                        textAlign: "left",
-                        fontSize: 13,
-                        color: "#6b7280",
-                        fontWeight: 500,
-                        borderBottom: "1px solid #f3f4f6",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                  {["Kategori", "Confidence", "User ID", "Status AI", "Waktu", "Aksi"].map((h) => (
+                    <th key={h} style={{
+                      padding: "12px 20px", textAlign: "left",
+                      fontSize: 13, color: "#6b7280", fontWeight: 500,
+                      borderBottom: "1px solid #f3f4f6", whiteSpace: "nowrap",
+                    }}>
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {loading && (
-                  [0, 1, 2].map((i) => (
-                    <tr key={i}>
-                      {[0, 1, 2, 3, 4].map((j) => (
-                        <td key={j} style={{ padding: "16px 20px" }}>
-                          <Skeleton w={j === 2 ? "70%" : "55%"} h={14} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
+                {loading && [0, 1, 2].map((i) => (
+                  <tr key={i}>
+                    {[0, 1, 2, 3, 4, 5].map((j) => (
+                      <td key={j} style={{ padding: "16px 20px" }}>
+                        <Skeleton w="55%" h={14} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
 
                 {!loading && lowConf.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
-                      No low confidence predictions found.
+                    <td colSpan={6} style={{
+                      padding: "40px 20px", textAlign: "center",
+                      color: "#9ca3af", fontSize: 14,
+                    }}>
+                      Tidak ada prediksi dengan confidence rendah.
                     </td>
                   </tr>
                 )}
 
                 {!loading && lowConf.map((item) => {
-                  const confPct = item.confidence != null
+                  const confPct  = item.confidence != null
                     ? `${(item.confidence * 100).toFixed(1)}%`
                     : "–";
                   const isFlagged = flagged.has(item.id);
+
                   return (
                     <tr
                       key={item.id}
@@ -410,29 +368,50 @@ const AIMonitoring = () => {
                       <td style={{ padding: "14px 20px" }}>
                         <CategoryBadge label={item.result || "–"} />
                       </td>
-                      <td style={{ padding: "14px 20px", fontWeight: 600, color: confidenceTextColor(item.confidence) }}>
+                      <td style={{
+                        padding: "14px 20px", fontWeight: 600,
+                        color: confidenceTextColor(item.confidence),
+                      }}>
                         {confPct}
                       </td>
                       <td style={{ padding: "14px 20px", color: "#111827", fontWeight: 500 }}>
-                        {item.user?.name || item.user_name || `User #${item.user_id}`}
+                        #{item.user_id}
                       </td>
-                      <td style={{ padding: "14px 20px", color: "#6b7280", whiteSpace: "nowrap", fontSize: 13 }}>
-                        {item.created_at ? dayjs(item.created_at).format("YYYY-MM-DD HH:mm:ss") : "–"}
+                      <td style={{ padding: "14px 20px" }}>
+                        {item.is_confident ? (
+                          <span style={{
+                            fontSize: 12, fontWeight: 600,
+                            color: "#16a34a", background: "#dcfce7",
+                            padding: "2px 8px", borderRadius: 999,
+                          }}>
+                            Akurat
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: 12, fontWeight: 600,
+                            color: "#b45309", background: "#fef3c7",
+                            padding: "2px 8px", borderRadius: 999,
+                          }}>
+                            Kurang Yakin
+                          </span>
+                        )}
+                      </td>
+                      <td style={{
+                        padding: "14px 20px", color: "#6b7280",
+                        whiteSpace: "nowrap", fontSize: 13,
+                      }}>
+                        {item.created_at
+                          ? dayjs(item.created_at).format("DD-MM-YYYY HH:mm:ss")
+                          : "–"}
                       </td>
                       <td style={{ padding: "14px 20px" }}>
                         <button
                           onClick={() => handleFlag(item.id)}
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                            background: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: isFlagged ? "#dc2626" : "#16a34a",
-                            padding: 0,
+                            display: "flex", alignItems: "center", gap: 5,
+                            background: "transparent", border: "none",
+                            cursor: "pointer", fontSize: 13, fontWeight: 600,
+                            color: isFlagged ? "#dc2626" : "#16a34a", padding: 0,
                           }}
                         >
                           <Flag size={14} />
@@ -448,9 +427,14 @@ const AIMonitoring = () => {
 
           {/* footer */}
           {!loading && (
-            <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{
+              padding: "12px 20px", borderTop: "1px solid #f3f4f6",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
               <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                {lowConf.length} low confidence scan{lowConf.length !== 1 ? "s" : ""} detected
+                {lowConf.length} scan dengan confidence rendah terdeteksi
+                {" · "}
+                {notConfidentScans.length} scan tidak confident (gap/threshold gagal)
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#9ca3af", fontSize: 12 }}>
                 <Brain size={13} />

@@ -10,6 +10,13 @@ class Top2Prediction(BaseModel):
     confidence: float
 
 
+class UpcycleIdea(BaseModel):
+    """Satu ide upcycling."""
+    id: int
+    title: str
+    description: str
+
+
 class ScanResult(BaseModel):
     """Response dari POST /scan/upload."""
     prediction_id: int
@@ -21,6 +28,7 @@ class ScanResult(BaseModel):
     image_path: Optional[str] = None
     top2: List[Top2Prediction] = []
     points_earned: int = 0
+    upcycle_ideas: List[UpcycleIdea] = []  # ← ditambahkan
 
     model_config = {"from_attributes": True}
 

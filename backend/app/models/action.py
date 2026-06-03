@@ -33,11 +33,14 @@ class Action(Base):
     # Foto bukti dari user
     proof_image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    # Poin dari aksi (lebih besar dari scan)
+    # Poin dari aksi
     points_earned: Mapped[int] = mapped_column(Integer, default=0)
 
     # Saldo rupiah khusus dari pengiriman ke mitra
     balance_earned: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Berat sampah dalam gram — diisi admin saat verifikasi route mitra
+    weight_gram: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # pending | approved | rejected
     status: Mapped[str] = mapped_column(String(50), default="pending")

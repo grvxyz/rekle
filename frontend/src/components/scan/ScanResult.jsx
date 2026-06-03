@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "@/components/ui/button";
+import GuestClaimBlock from "@/components/scan/GuestClaimBlock";
 import {
   Recycle,
   Palette,
@@ -8,11 +10,17 @@ import {
   Brain,
   CheckCircle2,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
+// ← base URL dari env, tidak hardcode localhost
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
 // Menerima props dari ScanPage — BUKAN dari location.state
-const ScanResult = ({ image, result, resetScan }) => {
+const ScanResult = ({ image, result, resetScan, isGuest }) => {
   const navigate = useNavigate();
+  const [showAllIdeas, setShowAllIdeas] = useState(false);
 
   if (!result) {
     return (
@@ -39,11 +47,22 @@ const ScanResult = ({ image, result, resetScan }) => {
   const handleLanjutAksi = () => {
     navigate("/action", {
       state: {
-        result:        result?.category || result?.result || null,
-        prediction_id: result?.id ?? null,
+        result:        result?.result || null,
+        prediction_id: result?.prediction_id ?? null,
       },
     });
   };
+
+  // Ide upcycling dari API
+  const ideas = result?.upcycle_ideas || [];
+  const visibleIdeas = showAllIdeas ? ideas : ideas.slice(0, 4);
+
+  // Bangun image URL dari base URL env
+  const imageUrl = image
+    ? image
+    : result?.image_path
+    ? `${BASE_URL}/${result.image_path}`
+    : null;
 
   return (
     <div className="space-y-8 mt-4">
@@ -60,11 +79,11 @@ const ScanResult = ({ image, result, resetScan }) => {
       {/* MAIN CONTENT */}
       <div className="grid md:grid-cols-2 gap-6">
 
-        {/* IMAGE — pakai prop image dari ScanPage, fallback ke image_path */}
-        {(image || result?.image_path) && (
+        {/* IMAGE */}
+        {imageUrl && (
           <div className="bg-white border rounded-3xl overflow-hidden shadow-sm">
             <img
-              src={image || `http://127.0.0.1:8000/${result.image_path}`}
+              src={imageUrl}
               alt="Result"
               className="w-full h-105 object-cover"
             />
@@ -204,14 +223,67 @@ const ScanResult = ({ image, result, resetScan }) => {
         </div>
       </div>
 
+      {/* UPCYCLE IDEAS */}
+      {ideas.length > 0 && (
+        <div className="bg-white border rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-2xl font-bold">Ide Daur Ulang Kreatif</h3>
+            <span className="text-sm text-slate-400">{ideas.length} ide</span>
+          </div>
+          <p className="text-sm text-slate-500 mb-6">
+            Sampah <span className="font-medium text-emerald-600">{result.result}</span> bisa
+            diubah menjadi berbagai karya kreatif berikut.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {visibleIdeas.map((idea) => (
+              <div
+                key={idea.id}
+                className="flex gap-4 p-4 border rounded-2xl hover:border-emerald-300 hover:bg-emerald-50 transition"
+              >
+                <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+                  {idea.id}
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-800">{idea.title}</p>
+                  <p className="text-sm text-slate-500 mt-1">{idea.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {ideas.length > 4 && (
+            <button
+              onClick={() => setShowAllIdeas(!showAllIdeas)}
+              className="mt-5 w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition text-sm font-medium"
+            >
+              {showAllIdeas ? (
+                <><ChevronUp className="w-4 h-4" /> Tampilkan lebih sedikit</>
+              ) : (
+                <><ChevronDown className="w-4 h-4" /> Lihat semua {ideas.length} ide</>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* BUTTONS */}
       <div className="flex flex-col md:flex-row gap-4">
-        <Button
-          className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-          onClick={handleLanjutAksi}
-        >
-          Lanjutkan ke Aksi
-        </Button>
+        {isGuest ? (
+          <div className="flex-1">
+            <GuestClaimBlock
+              pointsAvailable={result?.points ?? null}
+              message="Login untuk mengklaim poin dari hasil scan ini dan melanjutkan ke aksi."
+            />
+          </div>
+        ) : (
+          <Button
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+            onClick={handleLanjutAksi}
+          >
+            Lanjutkan ke Aksi
+          </Button>
+        )}
         <Button variant="outline" onClick={resetScan}>
           Scan Lagi
         </Button>

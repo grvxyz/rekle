@@ -19,14 +19,14 @@ const MitraLogin = () => {
     try {
       // 1. Login → dapat token
       const { data } = await api.post("/auth/login", { email, password });
-      localStorage.setItem("access_token",  data.access_token);
+      sessionStorage.setItem("access_token",  data.access_token);
       if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token);
+        sessionStorage.setItem("refresh_token", data.refresh_token);
       }
 
       // 2. Fetch profil untuk cek role
       const { data: me } = await api.get("/users/me");
-      localStorage.setItem("is_superuser", me.is_superuser ? "true" : "false");
+      sessionStorage.setItem("is_superuser", me.is_superuser ? "true" : "false");
 
       if (me.is_superuser) {
         navigate("/admin/dashboard");
@@ -45,9 +45,9 @@ const MitraLogin = () => {
       }
 
     } catch (err) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("is_superuser");
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("is_superuser");
       setError(err.response?.data?.detail || err.message || "Login gagal");
     } finally {
       setLoading(false);

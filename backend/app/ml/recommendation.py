@@ -1,20 +1,22 @@
 from typing import Dict, Optional
 
-# ─── Mapping kategori → rekomendasi aksi ───────────────────
-# Sesuai flow diagram: setiap kategori punya aksi utama yang disarankan
+# ─── Mapping label → kode aksi ─────────────────────────────
+# Label sesuai app/ml/class_names.json (9 kelas)
 
-_RECOMMENDATION_MAP: Dict[str, str] = {
-    "organik":          "kompos",
-    "plastik_pet":      "daur_ulang",
-    "plastik_hdpe":     "daur_ulang",
-    "plastik_campuran": "eco_brick",
-    "kertas_bersih":    "daur_ulang",
-    "kertas_kotor":     "tidak_layak",
-    "kaca_utuh":        "reuse",
-    "kaca_pecah":       "khusus",
+_RECOMMENDATION_MAP: Dict[str, Optional[str]] = {
+    "organik":    "kompos",
+    "Plastik":    "daur_ulang",
+    "Kertas":     "daur_ulang",
+    "Kardus":     "daur_ulang",
+    "Kaca":       "reuse",
+    "Logam":      "daur_ulang",
+    "B3":         "khusus",
+    "Medis":      "khusus",
+    "nonsampah":  None,          # bukan sampah, tidak ada aksi
 }
 
-# Detail penjelasan per rekomendasi (ditampilkan ke user)
+# ─── Detail per jenis aksi ─────────────────────────────────
+
 _ACTION_DETAIL: Dict[str, Dict] = {
     "kompos": {
         "label":       "Buat kompos",
@@ -28,27 +30,16 @@ _ACTION_DETAIL: Dict[str, Dict] = {
         "icon":        "recycle",
         "can_self":    False,
     },
-    "eco_brick": {
-        "label":       "Eco brick",
-        "description": "Plastik campuran bisa dijadikan eco brick sebagai material bangunan.",
-        "icon":        "eco_brick",
-        "can_self":    True,
-    },
     "reuse": {
         "label":       "Gunakan kembali",
-        "description": "Kaca utuh masih bisa digunakan atau dijual ke pengepul.",
+        "description": "Masih bisa digunakan kembali atau dijual ke pengepul.",
         "icon":        "reuse",
         "can_self":    True,
     },
-    "tidak_layak": {
-        "label":       "Tidak layak daur ulang",
-        "description": "Kertas kotor/basah tidak bisa didaur ulang, buang ke sampah residu.",
-        "icon":        "trash",
-        "can_self":    False,
-    },
     "khusus": {
         "label":       "Penanganan khusus",
-        "description": "Kaca pecah berbahaya, bungkus rapat sebelum dibuang.",
+        "description": "Limbah ini memerlukan penanganan khusus. "
+                       "Jangan buang sembarangan — serahkan ke fasilitas pengelola limbah B3/medis.",
         "icon":        "warning",
         "can_self":    False,
     },
@@ -58,9 +49,13 @@ _ACTION_DETAIL: Dict[str, Dict] = {
 def get_recommendation(label: str) -> Optional[str]:
     """
     Kembalikan kode aksi dari label klasifikasi.
-    Contoh: "plastik_pet" → "daur_ulang"
+    Contoh: "Plastik" → "daur_ulang"
+    Kembalikan None jika label = "nonsampah" atau tidak dikenal.
     """
-    return _RECOMMENDATION_MAP.get(label)
+    # Eksplisit cek — label dikenal tapi tidak punya aksi (nonsampah)
+    if label in _RECOMMENDATION_MAP:
+        return _RECOMMENDATION_MAP[label]
+    return None
 
 
 def get_action_detail(action_type: str) -> Optional[Dict]:
@@ -68,12 +63,18 @@ def get_action_detail(action_type: str) -> Optional[Dict]:
     return _ACTION_DETAIL.get(action_type)
 
 
-def get_full_recommendation(label: str) -> Dict:
+def get_full_recommendation(label: str) -> Optional[Dict]:
     """
     Kembalikan rekomendasi lengkap: kode aksi + detail.
-    Dipakai langsung oleh scan endpoint.
+    Kembalikan None jika label = "nonsampah" atau tidak dikenal.
+    Dipakai langsung oleh scan endpoint dan classifier service.
     """
-    action_type = get_recommendation(label) or "khusus"
+    action_type = get_recommendation(label)
+
+    # nonsampah atau label tidak dikenal → tidak ada rekomendasi
+    if action_type is None:
+        return None
+
     detail = get_action_detail(action_type) or {}
     return {
         "action_type": action_type,

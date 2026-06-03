@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.jsx";
 import { Button } from "../ui/button.jsx";
 import Input from "../ui/input.jsx";
@@ -40,24 +41,21 @@ function validate(form) {
 // PROFILE FORM
 // ======================================================
 
-function ProfileForm({ form, setForm, onSave }) {
-  const [loading, setLoading]   = useState(false);
-  const [errors, setErrors]     = useState({});
-  const [savedForm, setSavedForm] = useState(form); // snapshot terakhir yang berhasil disimpan
+function ProfileForm({ form, setForm, onSave, onCancel }) {
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [savedForm, setSavedForm] = useState(form);
 
-  // Deteksi apakah ada perubahan dari data tersimpan
   const isDirty = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(savedForm),
     [form, savedForm]
   );
 
-  // ── HANDLE INPUT ──────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({ ...prev, [name]: value }));
 
-    // Hapus error field ini begitu user mulai mengetik
     if (errors[name]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -67,7 +65,6 @@ function ProfileForm({ form, setForm, onSave }) {
     }
   };
 
-  // ── HANDLE SAVE ───────────────────────────────────────
   const handleSubmit = async () => {
     const validationErrors = validate(form);
 
@@ -80,11 +77,13 @@ function ProfileForm({ form, setForm, onSave }) {
       setLoading(true);
       setErrors({});
       await onSave(form);
-      setSavedForm(form); // update snapshot setelah berhasil
+      setSavedForm(form);
     } catch (err) {
       console.error(err);
-      // Tampilkan error dari server jika ada, fallback ke pesan generik
-      setErrors({ _server: err.response?.data?.detail || err.message || "Gagal menyimpan" });
+      setErrors({
+        _server:
+          err.response?.data?.detail || err.message || "Gagal menyimpan",
+      });
     } finally {
       setLoading(false);
     }
@@ -92,12 +91,25 @@ function ProfileForm({ form, setForm, onSave }) {
 
   return (
     <Card className="rounded-2xl shadow-sm border p-4">
+      {/* ✓ FIX: Tombol Kembali di bagian atas */}
+      <div className="px-4 pt-4 pb-2">
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors group"
+        >
+          <ArrowLeft
+            size={16}
+            className="group-hover:-translate-x-0.5 transition-transform"
+          />
+          Kembali
+        </button>
+      </div>
+
       <CardHeader>
         <CardTitle className="mb-4">Profile Settings</CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-5">
-
         {/* HEADER */}
         <ProfileHeader name={form.full_name} email={form.email} />
 
@@ -110,7 +122,6 @@ function ProfileForm({ form, setForm, onSave }) {
 
         {/* FORM GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
           {/* NAMA */}
           <Field label="Nama Lengkap" icon={<User size={16} />} error={errors.full_name}>
             <Input
@@ -132,7 +143,11 @@ function ProfileForm({ form, setForm, onSave }) {
           </Field>
 
           {/* PHONE */}
-          <Field label="Nomor Telepon" icon={<Phone size={16} />} error={errors.phone_number}>
+          <Field
+            label="Nomor Telepon"
+            icon={<Phone size={16} />}
+            error={errors.phone_number}
+          >
             <Input
               name="phone_number"
               value={form.phone_number || ""}
@@ -150,7 +165,6 @@ function ProfileForm({ form, setForm, onSave }) {
               onChange={handleChange}
             />
           </Field>
-
         </div>
 
         {/* BIO */}
@@ -166,24 +180,29 @@ function ProfileForm({ form, setForm, onSave }) {
             maxLength={300}
             aria-invalid={!!errors.bio}
           />
-          {/* Counter karakter */}
           <p className="text-xs text-gray-400 text-right mt-1">
             {(form.bio || "").length}/300
           </p>
         </Field>
 
-        {/* BUTTON */}
-        <div className="flex justify-end">
+        {/* ✓ FIX: Button section dengan Batal dan Simpan */}
+        <div className="flex gap-3 pt-4 border-t">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Batal
+          </button>
           <Button
             onClick={handleSubmit}
             disabled={loading || !isDirty}
-            className="gap-2"
+            className="flex-1 gap-2"
           >
             <Save size={16} />
             {loading ? "Menyimpan..." : "Simpan Perubahan"}
           </Button>
         </div>
-
       </CardContent>
     </Card>
   );

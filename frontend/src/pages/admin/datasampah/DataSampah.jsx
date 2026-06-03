@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Search, Filter, Image as ImageIcon, CheckCircle2, AlertTriangle, Brain } from "lucide-react";
 import api from "@/lib/axios";
+import { buildImageUrl } from "@/lib/imageURL";
 import dayjs from "dayjs";
 
 // ======================================================
@@ -8,24 +9,24 @@ import dayjs from "dayjs";
 // ======================================================
 
 const CATEGORY_CONFIG = {
-  organik:          { label: "Organik",        className: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
-  plastik_pet:      { label: "Plastik PET",     className: "bg-blue-100 text-blue-700 border border-blue-200" },
-  plastik_hdpe:     { label: "Plastik HDPE",    className: "bg-blue-100 text-blue-700 border border-blue-200" },
-  plastik_campuran: { label: "Plastik",         className: "bg-blue-100 text-blue-700 border border-blue-200" },
-  kertas_bersih:    { label: "Kertas",          className: "bg-yellow-100 text-yellow-700 border border-yellow-200" },
-  kertas_kotor:     { label: "Kertas Kotor",    className: "bg-orange-100 text-orange-700 border border-orange-200" },
-  kaca_utuh:        { label: "Kaca",            className: "bg-cyan-100 text-cyan-700 border border-cyan-200" },
-  kaca_pecah:       { label: "Kaca Pecah",      className: "bg-red-100 text-red-700 border border-red-200" },
-  "Tidak dikenali": { label: "Tidak Dikenali",  className: "bg-gray-100 text-gray-600 border border-gray-200" },
+  B3:        { label: "B3",         className: "bg-red-100 text-red-700 border border-red-200" },
+  Kaca:      { label: "Kaca",       className: "bg-cyan-100 text-cyan-700 border border-cyan-200" },
+  Kardus:    { label: "Kardus",     className: "bg-amber-100 text-amber-700 border border-amber-200" },
+  Kertas:    { label: "Kertas",     className: "bg-yellow-100 text-yellow-700 border border-yellow-200" },
+  Logam:     { label: "Logam",      className: "bg-slate-100 text-slate-700 border border-slate-200" },
+  Medis:     { label: "Medis",      className: "bg-pink-100 text-pink-700 border border-pink-200" },
+  Plastik:   { label: "Plastik",    className: "bg-blue-100 text-blue-700 border border-blue-200" },
+  nonsampah: { label: "Non-Sampah", className: "bg-gray-100 text-gray-600 border border-gray-200" },
+  organik:   { label: "Organik",    className: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
 };
 
 const RECOMMENDATION_LABEL = {
-  kompos:       "Dikompos",
-  daur_ulang:   "Didaur Ulang",
-  eco_brick:    "Eco Brick",
-  reuse:        "Digunakan Ulang",
-  tidak_layak:  "Tidak Layak",
-  khusus:       "Penanganan Khusus",
+  kompos:      "Dikompos",
+  daur_ulang:  "Didaur Ulang",
+  eco_brick:   "Eco Brick",
+  reuse:       "Digunakan Ulang",
+  tidak_layak: "Tidak Layak",
+  khusus:      "Penanganan Khusus",
 };
 
 // ======================================================
@@ -45,17 +46,6 @@ function getConfidenceColor(confidence) {
   if (confidence >= 0.75) return "bg-green-400";
   if (confidence >= 0.6)  return "bg-yellow-400";
   return "bg-red-400";
-}
-
-// ── Build URL gambar dari path relatif atau absolut ────────
-const BASE_MEDIA_URL = "http://127.0.0.1:8000";
-
-function buildImageUrl(path) {
-  if (!path) return null;
-  // Sudah full URL, pakai langsung
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  // Hilangkan leading slash agar tidak double slash
-  return `${BASE_MEDIA_URL}/${path.replace(/^\/+/, "")}`;
 }
 
 // ======================================================
@@ -82,7 +72,6 @@ function ImageThumb({ path }) {
   const [hasError, setHasError] = useState(false);
   const src = buildImageUrl(path);
 
-  // Reset error state kalau path berubah
   useEffect(() => { setHasError(false); }, [path]);
 
   if (!src || hasError) {
@@ -148,7 +137,16 @@ const DataSampah = () => {
     }
   }, []);
 
-  useEffect(() => { fetchScans(); }, [fetchScans]);
+  // Auto refresh setiap 30 detik
+  useEffect(() => {
+    fetchScans();
+
+    const interval = setInterval(() => {
+      fetchScans();
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [fetchScans]);
 
   // ======================================================
   // FILTER & SEARCH

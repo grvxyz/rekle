@@ -22,20 +22,20 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
-    database_url: str = "postgresql://postgres:password@db:5432/rekle_db"
+    database_url: str = ""
 
-    secret_key: str = "replace-with-a-secure-key"
+    secret_key: str = ""
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
 
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    allowed_origins: str = "https://rekle.vercel.app,http://localhost:5173"
 
     @property
     def allowed_origins_list(self) -> List[str]:
         return [o.strip() for o in self.allowed_origins.split(",")]
 
-    upload_dir: str = str(BASE_DIR / "uploads")
+    upload_dir: str = "uploads"
     max_upload_size_mb: int = 10
     allowed_image_types: str = "image/jpeg,image/png,image/webp"
 
@@ -62,14 +62,7 @@ class Settings(BaseSettings):
     ml_confidence_gap_threshold: float = 0.2
 
     ml_class_labels: str = (
-        "organik,"
-        "plastik_pet,"
-        "plastik_hdpe,"
-        "plastik_campuran,"
-        "kertas_bersih,"
-        "kertas_kotor,"
-        "kaca_utuh,"
-        "kaca_pecah"
+    "B3,Kaca,Kardus,Kertas,Logam,Medis,Plastik,nonsampah,organik"
     )
 
     @property
@@ -114,7 +107,7 @@ if settings.is_development:
     print("REKLE CONFIG")
     print("====================================")
     print("DATABASE_URL:")
-    print(settings.database_url)
+    print(settings.database_url[:30] + "..." if settings.database_url else "NOT SET")
     print()
     print("MODEL PATH:")
     print(settings.ml_model_path)

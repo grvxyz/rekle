@@ -4,12 +4,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 from app.api.v1.deps import get_current_superuser, get_current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.action import Action
 from app.models.user import User
+from app.models.prediction import Prediction
 from app.schemas.action_schema import (
     ActionCreateSchema,
     ActionResponse,
@@ -29,12 +31,6 @@ def save_proof(image_bytes: bytes, content_type: str) -> str:
     with open(filepath, "wb") as f:
         f.write(image_bytes)
     return filepath
-
-
-# ─── PENTING: semua endpoint statis harus di atas /{action_id} ───
-# Jika /pending atau /pending/count diletakkan setelah /{action_id},
-# FastAPI akan menangkap string "pending" sebagai action_id integer
-# dan langsung return 422 Unprocessable Entity.
 
 
 # ─── 1. User buat aksi setelah scan ────────────────────────
@@ -68,6 +64,7 @@ def create_action(
     db.add(action)
     db.commit()
     db.refresh(action)
+
     return action
 
 
@@ -90,6 +87,69 @@ def get_my_actions(
     )
 
 
+# ─── 2.5 User lihat aktivitas terbaru ─────────────────────
+@router.get("/activity")
+def get_recent_activity(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Gabungkan riwayat scan + action user.
+    Dipakai untuk dashboard activity terbaru.
+    """
+    predictions = (
+        db.query(Prediction)
+        .filter(Prediction.user_id == current_user.id)
+        .order_by(Prediction.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    actions = (
+        db.query(Action)
+        .filter(Action.user_id == current_user.id)
+        .order_by(Action.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    scan_items = [
+        {
+            "type": "scan",
+            "id": p.id,
+            "title": f"Scan {p.result}",
+            "description": p.recommendation,
+            "created_at": p.created_at,
+        }
+        for p in predictions
+    ]
+
+    action_items = [
+        {
+            "type": "action",
+            "id": a.id,
+            "title": f"Aksi {a.action_type}",
+            "description": (
+                getattr(a, "notes", None)
+                or f"Status: {a.status}"
+            ),
+            "created_at": a.created_at,
+            "status": getattr(a, "status", None),
+            "points_earned": getattr(a, "points_earned", 0) or 0,
+        }
+        for a in actions
+    ]
+
+    merged = sorted(
+        scan_items + action_items,
+        key=lambda x: x["created_at"],
+        reverse=True,
+    )
+
+    return merged[:limit]
+
+
 # ─── 3. Admin: jumlah aksi pending ─────────────────────────
 @router.get("/pending/count")
 def get_pending_count(
@@ -105,7 +165,6 @@ def get_pending_count(
     return {"count": count}
 
 
-# ─── 4. Admin: lihat semua aksi pending ────────────────────
 @router.get("/pending", response_model=list[ActionResponse])
 def get_pending_actions(
     skip: int = 0,
@@ -116,13 +175,14 @@ def get_pending_actions(
     """Admin: lihat semua aksi yang menunggu verifikasi."""
     return (
         db.query(Action)
+        .options(joinedload(Action.user))          # ← sertakan data user sekalian
         .filter(Action.status == "pending")
         .order_by(Action.created_at.asc())
         .offset(skip)
         .limit(limit)
         .all()
     )
-
+ 
 
 # ─── 5. User upload bukti foto ──────────────────────────────
 @router.post("/{action_id}/proof", response_model=ActionResponse)
@@ -218,6 +278,7 @@ def verify_action(
         user.action_count = (user.action_count or 0) + 1
 
         if action.route == "mitra" and payload.weight_gram:
+            action.weight_gram = payload.weight_gram  # ← disimpan ke DB
             balance = (payload.weight_gram / 1000) * settings.balance_per_kg
             action.balance_earned = int(balance)
             user.balance = (user.balance or 0) + int(balance)
@@ -229,4 +290,110 @@ def verify_action(
         action=action,
         total_points=user.total_points,
         total_balance=user.balance,
+    )
+
+
+# ─── 7. Detail aktivitas user ─────────────────────────────
+@router.get("/activity/{activity_type}/{activity_id}")
+def get_activity_detail(
+    activity_type: str,
+    activity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Detail scan / action untuk modal dashboard.
+    """
+
+    # ===== SCAN =====
+    if activity_type == "scan":
+
+        prediction = (
+            db.query(Prediction)
+            .options(joinedload(Prediction.action))
+            .filter(
+                Prediction.id == activity_id,
+                Prediction.user_id == current_user.id,
+            )
+            .first()
+        )
+
+        if not prediction:
+            raise HTTPException(
+                status_code=404,
+                detail="Scan tidak ditemukan",
+            )
+
+        return {
+            "type": "scan",
+            "id": prediction.id,
+            "image_path": prediction.image_path,
+            "result": prediction.result,
+            "confidence": prediction.confidence,
+            "recommendation": prediction.recommendation,
+            "created_at": prediction.created_at,
+            "action": (
+                {
+                    "id": prediction.action.id,
+                    "action_type": prediction.action.action_type,
+                    "route": prediction.action.route,
+                    "status": prediction.action.status,
+                    "points_earned": prediction.action.points_earned,
+                    "proof_image_path": prediction.action.proof_image_path,
+                    "created_at": prediction.action.created_at,
+                }
+                if prediction.action
+                else None
+            ),
+        }
+
+    # ===== ACTION =====
+    elif activity_type == "action":
+
+        action = (
+            db.query(Action)
+            .options(joinedload(Action.prediction))
+            .filter(
+                Action.id == activity_id,
+                Action.user_id == current_user.id,
+            )
+            .first()
+        )
+
+        if not action:
+            raise HTTPException(
+                status_code=404,
+                detail="Action tidak ditemukan",
+            )
+
+        return {
+            "type": "action",
+            "id": action.id,
+            "action_type": action.action_type,
+            "route": action.route,
+            "status": action.status,
+            "notes": action.notes,
+            "points_earned": action.points_earned,
+            "balance_earned": action.balance_earned,
+            "weight_gram": action.weight_gram,           # ← ditambahkan
+            "proof_image_path": action.proof_image_path,
+            "rejection_reason": action.rejection_reason,
+            "verified_at": action.verified_at,
+            "created_at": action.created_at,
+            "prediction": (
+                {
+                    "id": action.prediction.id,
+                    "image_path": action.prediction.image_path,
+                    "result": action.prediction.result,
+                    "confidence": action.prediction.confidence,
+                    "recommendation": action.prediction.recommendation,
+                }
+                if action.prediction
+                else None
+            ),
+        }
+
+    raise HTTPException(
+        status_code=400,
+        detail="activity_type tidak valid",
     )
