@@ -309,7 +309,7 @@ const HistoryPage = () => {
 
               <ArrowLeft className="w-4 h-4" />
 
-              Kembali
+              Kembali 
 
             </button>
 
