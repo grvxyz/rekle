@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import api from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
 
 const MitraLogin = () => {
   const navigate = useNavigate();
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const { login, logout, isLoggedIn } = useAuth();
+  const [email,       setEmail]       = useState("");
+  const [password,    setPassword]    = useState("");
+  const [showPass,    setShowPass]    = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
+  const [destination, setDestination] = useState(null);
+
+  // Navigate setelah isLoggedIn benar-benar true (state sudah terupdate)
+  useEffect(() => {
+    if (isLoggedIn && destination) {
+      navigate(destination, { replace: true });
+    }
+  }, [isLoggedIn, destination, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -19,35 +29,41 @@ const MitraLogin = () => {
     try {
       // 1. Login → dapat token
       const { data } = await api.post("/auth/login", { email, password });
-      sessionStorage.setItem("access_token",  data.access_token);
+
+      if (!data?.access_token) {
+        throw new Error("Token tidak ditemukan dari server");
+      }
+
+      // 2. Simpan token sementara supaya interceptor bisa mengirim request terautentikasi
+      sessionStorage.setItem("access_token", data.access_token);
       if (data.refresh_token) {
         sessionStorage.setItem("refresh_token", data.refresh_token);
       }
 
-      // 2. Fetch profil untuk cek role
+      // 3. Fetch profil untuk cek role
       const { data: me } = await api.get("/users/me");
-      sessionStorage.setItem("is_superuser", me.is_superuser ? "true" : "false");
 
       if (me.is_superuser) {
-        navigate("/admin/dashboard");
+        login({ accessToken: data.access_token, refreshToken: data.refresh_token, superuser: true });
+        setDestination("/admin/dashboard");
         return;
       }
 
-      // 3. Cek apakah user punya mitra terdaftar (endpoint /mitra/mine)
-      const { data: mitraList } = await api.get("/mitra/mine");
-      const hasMitra = Array.isArray(mitraList) && mitraList.length > 0;
-
-      if (hasMitra) {
-        navigate("/mitra/dashboard");
-      } else {
-        // User belum punya mitra → arahkan ke registrasi
-        navigate("/mitra/register");
+      // 4. Cek apakah user punya mitra terdaftar
+      let hasMitra = false;
+      try {
+        const { data: mitraList } = await api.get("/mitra/mine");
+        hasMitra = Array.isArray(mitraList) && mitraList.length > 0;
+      } catch {
+        hasMitra = false;
       }
 
+      // 5. Set login state, lalu useEffect yang akan navigate
+      login({ accessToken: data.access_token, refreshToken: data.refresh_token, superuser: false });
+      setDestination(hasMitra ? "/mitra/dashboard" : "/mitra/register");
+
     } catch (err) {
-      sessionStorage.removeItem("access_token");
-      sessionStorage.removeItem("refresh_token");
-      sessionStorage.removeItem("is_superuser");
+      logout();
       setError(err.response?.data?.detail || err.message || "Login gagal");
     } finally {
       setLoading(false);

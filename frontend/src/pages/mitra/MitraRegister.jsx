@@ -443,20 +443,27 @@ const MitraRegister = () => {
       setSuccess(true);
 
     } catch (err) {
-      console.error(err);
-      if (err.response?.status === 422) {
-        setError(parseFastAPIError(err.response.data));
-      } else {
-        setError(err.response?.data?.detail || "Pendaftaran gagal. Pastikan email belum terdaftar.");
-      }
-      
-      // Hapus token jika pembentukan data mitra gagal di tengah jalan
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-    } finally {
-      setLoading(false);
-    }
-  };
+  console.error("REGISTER ERROR:", err);
+
+  console.log("STATUS:", err.response?.status);
+  console.log("DATA:", err.response?.data);
+  console.log("DETAIL:", err.response?.data?.detail);
+
+  if (err.response?.status === 422) {
+    setError(parseFastAPIError(err.response.data));
+  } else {
+    setError(
+      err.response?.data?.detail ||
+      JSON.stringify(err.response?.data) ||
+      "Pendaftaran gagal. Pastikan email belum terdaftar."
+    );
+  }
+
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+} finally {
+  setLoading(false);
+} };
 
   // ─── Success Screen ──────────────────────────────────────
   if (success) {

@@ -74,7 +74,9 @@ function AdminRoute({ children }) {
 }
 
 function MitraRoute({ children }) {
-  const { isLoggedIn, isSuperuser } = useAuth();
+  const { isLoggedIn, isSuperuser, token } = useAuth();
+  // Jika token belum diinisialisasi (undefined), tunggu dulu — jangan redirect
+  if (token === undefined) return null;
   if (!isLoggedIn) return <Navigate to="/mitra/login" replace />;
   if (isSuperuser) return <Navigate to="/admin/dashboard" replace />;
   return children;
