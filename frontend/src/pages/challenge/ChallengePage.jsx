@@ -31,7 +31,7 @@ export default function ChallengePage() {
         setUser(userData);
 
         // 2. Challenges aktif
-        const response = await api.get("/content?type=challenge&status=active");
+        const response = await api.get("/content/?type=challenge&status=active");
         const challengeData = Array.isArray(response.data)
           ? response.data
           : response.data?.items ?? response.data?.data ?? [];
