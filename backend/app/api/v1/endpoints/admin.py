@@ -4,13 +4,14 @@ from sqlalchemy import func
 from typing import Dict, List, Optional
 from datetime import date, datetime, timedelta, timezone
 from pydantic import BaseModel
+import os
 
 from app.db.session import get_db
 from app.models.user import User
 from app.models.prediction import Prediction
 from app.models.action import Action
 from app.models.mitra import Mitra
-from app.models.point_setting import PointSetting          # ← ditambahkan
+from app.models.point_setting import PointSetting
 from app.schemas.user_schema import UserResponse
 from app.api.v1.deps import get_current_superuser
 from app.models.content import Content
@@ -176,6 +177,30 @@ def list_all_scans(
     return ScanHistoryList(total=total, items=items)
 
 
+# ── TAMBAHAN BARU ──────────────────────────────────────────
+@router.delete("/scans/{prediction_id}", status_code=204)
+def admin_delete_scan(
+    prediction_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superuser),
+):
+    """Admin menghapus data scan berdasarkan ID."""
+    prediction = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not prediction:
+        raise HTTPException(status_code=404, detail="Scan tidak ditemukan")
+
+    # Hapus file gambar dari disk jika ada
+    if prediction.image_path and os.path.exists(prediction.image_path):
+        try:
+            os.remove(prediction.image_path)
+        except OSError:
+            pass  # Lanjut meski file gagal dihapus
+
+    db.delete(prediction)
+    db.commit()
+# ──────────────────────────────────────────────────────────
+
+
 # =========================================================
 # MITRA VERIFICATION
 # =========================================================
@@ -247,7 +272,7 @@ def verify_mitra(
 
 
 # =========================================================
-# POINT SETTINGS                                    ← BARU
+# POINT SETTINGS
 # =========================================================
 
 class PointSettingItem(BaseModel):
@@ -261,47 +286,28 @@ def get_point_settings(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """
-    Kembalikan semua pengaturan poin sebagai dict {key: {label, points, balance}}.
-    Format ini langsung kompatibel dengan PointSettingsPanel di frontend.
-    """
-    rows = db.query(PointSetting).all()
-    return {
-        row.key: {
-            "label":   row.label,
-            "points":  row.points,
-            "balance": row.balance,
-        }
-        for row in rows
-    }
+    settings = db.query(PointSetting).all()
+    return settings
 
 
-@router.put("/point-settings")
-def update_point_settings(
-    payload: Dict[str, PointSettingItem],
+@router.patch("/point-settings/{action_type}")
+def update_point_setting(
+    action_type: str,
+    payload: PointSettingItem,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    """
-    Terima dict {key: {label, points, balance}} dari frontend.
-    Upsert tiap key ke tabel point_settings.
-    """
-    for key, item in payload.items():
-        row = db.query(PointSetting).filter(PointSetting.key == key).first()
-        if row:
-            row.label   = item.label
-            row.points  = item.points
-            row.balance = item.balance
-        else:
-            db.add(PointSetting(
-                key=key,
-                label=item.label,
-                points=item.points,
-                balance=item.balance,
-            ))
+    setting = db.query(PointSetting).filter(PointSetting.action_type == action_type).first()
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting tidak ditemukan")
+
+    setting.label   = payload.label
+    setting.points  = payload.points
+    setting.balance = payload.balance
 
     db.commit()
-    return {"message": "Pengaturan poin berhasil disimpan"}
+    db.refresh(setting)
+    return setting
 
 
 # =========================================================
@@ -315,31 +321,31 @@ def scan_analytics(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    category_query = db.query(
+    by_category_query = db.query(
         Prediction.result,
         func.count(Prediction.id).label("count"),
     )
-    recommendation_query = db.query(
+    by_recommendation_query = db.query(
         Prediction.recommendation,
         func.count(Prediction.id).label("count"),
     )
 
     if start_date and end_date:
-        category_query = category_query.filter(
+        by_category_query = by_category_query.filter(
             func.date(Prediction.created_at).between(start_date, end_date)
         )
-        recommendation_query = recommendation_query.filter(
+        by_recommendation_query = by_recommendation_query.filter(
             func.date(Prediction.created_at).between(start_date, end_date)
         )
 
     by_category = (
-        category_query
+        by_category_query
         .group_by(Prediction.result)
         .order_by(func.count(Prediction.id).desc())
         .all()
     )
     by_recommendation = (
-        recommendation_query
+        by_recommendation_query
         .group_by(Prediction.recommendation)
         .order_by(func.count(Prediction.id).desc())
         .all()

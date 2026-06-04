@@ -49,7 +49,7 @@ function rankStyle(index) {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ───Sub-components ─────────────────────────────────────────────────────────── 
 
 function SkeletonRow() {
   return (
@@ -87,7 +87,7 @@ function EmptyState() {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ───Main Component ───────────────────────────────────────────────────────────
 
 function LeaderboardCard({
   users: usersProp = [],

@@ -1,16 +1,3 @@
-/**
- * ChallengeCard.jsx
- *
- * Menampilkan satu challenge sebagai card ringkas.
- * Klik "Lihat Detail" → navigate ke /challenge/:id
- *
- * FIX vs backend:
- * - challenge_type dari ContentResponse: "scan" | "action" | "points"  ✓ (sudah sesuai)
- * - status dari ContentResponse: "draft" | "active" | "inactive" — tambah "draft"
- * - progress pakai field `current` yang di-inject oleh parent (ChallengePage)
- * - reward_points default 0 sesuai ContentBase ✓
- * - target nullable sesuai ContentBase ✓
- */
 
 import { useNavigate } from "react-router-dom";
 

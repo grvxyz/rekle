@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Search, Filter, Image as ImageIcon, CheckCircle2, AlertTriangle, Brain } from "lucide-react";
+import { Search, Filter, Image as ImageIcon, CheckCircle2, AlertTriangle, Brain, Trash2 } from "lucide-react";
 import api from "@/lib/axios";
 import { buildImageUrl } from "@/lib/imageURL";
 import dayjs from "dayjs";
@@ -55,7 +55,7 @@ function getConfidenceColor(confidence) {
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-100">
-      {[...Array(7)].map((_, i) => (
+      {[...Array(8)].map((_, i) => (
         <td key={i} className="px-4 py-4">
           <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: i === 0 ? 40 : i === 3 ? 120 : 80 }} />
         </td>
@@ -93,6 +93,42 @@ function ImageThumb({ path }) {
 }
 
 // ======================================================
+// CONFIRM DIALOG
+// ======================================================
+
+function ConfirmDialog({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 w-full max-w-sm mx-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <Trash2 className="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">Hapus Data Scan?</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Tindakan ini tidak bisa dibatalkan.</p>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition"
+          >
+            Ya, Hapus
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ======================================================
 // MAIN PAGE
 // ======================================================
 
@@ -104,6 +140,12 @@ const DataSampah = () => {
   const [filterOpen, setFilterOpen]         = useState(false);
   const [filterCategory, setFilterCategory] = useState("semua");
   const [total, setTotal]                   = useState(0);
+
+  // ── State delete ──────────────────────────────────────
+  const [deletingId, setDeletingId]         = useState(null);   // ID yang sedang dihapus (loading)
+  const [confirmId, setConfirmId]           = useState(null);   // ID yang menunggu konfirmasi
+  const [deleteError, setDeleteError]       = useState("");
+  // ─────────────────────────────────────────────────────
 
   // ======================================================
   // FETCH
@@ -140,13 +182,33 @@ const DataSampah = () => {
   // Auto refresh setiap 30 detik
   useEffect(() => {
     fetchScans();
-
-    const interval = setInterval(() => {
-      fetchScans();
-    }, 30_000);
-
+    const interval = setInterval(fetchScans, 30_000);
     return () => clearInterval(interval);
   }, [fetchScans]);
+
+  // ======================================================
+  // DELETE HANDLER
+  // ======================================================
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const id = confirmId;
+    setConfirmId(null);
+
+    try {
+      setDeletingId(id);
+      setDeleteError("");
+      await api.delete(`/admin/scans/${id}`);
+      setScans((prev) => prev.filter((item) => item.id !== id));
+      setTotal((prev) => prev - 1);
+    } catch (err) {
+      console.error("Delete scan error:", err);
+      setDeleteError(
+        err.response?.data?.detail || "Gagal menghapus data scan."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }, [confirmId]);
 
   // ======================================================
   // FILTER & SEARCH
@@ -173,6 +235,14 @@ const DataSampah = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      {/* ── CONFIRM DIALOG ── */}
+      {confirmId !== null && (
+        <ConfirmDialog
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setConfirmId(null)}
+        />
+      )}
+
       <div className="max-w-7xl mx-auto">
 
         {/* ── HEADER ── */}
@@ -229,10 +299,23 @@ const DataSampah = () => {
           )}
         </div>
 
-        {/* ── ERROR ── */}
+        {/* ── ERROR FETCH ── */}
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
             {error}
+          </div>
+        )}
+
+        {/* ── ERROR DELETE ── */}
+        {deleteError && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
+            <span>{deleteError}</span>
+            <button
+              onClick={() => setDeleteError("")}
+              className="ml-4 text-red-500 hover:text-red-700 text-xs underline"
+            >
+              Tutup
+            </button>
           </div>
         )}
 
@@ -249,6 +332,7 @@ const DataSampah = () => {
                   <th className="px-4 py-3 font-medium">Rekomendasi</th>
                   <th className="px-4 py-3 font-medium">Status AI</th>
                   <th className="px-4 py-3 font-medium">Waktu</th>
+                  <th className="px-4 py-3 font-medium">Aksi</th>
                 </tr>
               </thead>
 
@@ -258,7 +342,7 @@ const DataSampah = () => {
 
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center text-gray-400 text-sm">
+                    <td colSpan={8} className="px-4 py-16 text-center text-gray-400 text-sm">
                       {search || filterCategory !== "semua"
                         ? "Tidak ada data yang cocok dengan filter."
                         : "Belum ada data scan."}
@@ -271,10 +355,13 @@ const DataSampah = () => {
                   const pct      = item.confidence ? (item.confidence * 100).toFixed(1) : 0;
                   const barColor = getConfidenceColor(item.confidence);
                   const recLabel = RECOMMENDATION_LABEL[item.recommendation] || item.recommendation || "-";
+                  const isDeleting = deletingId === item.id;
 
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-
+                    <tr
+                      key={item.id}
+                      className={`hover:bg-gray-50 transition-colors ${isDeleting ? "opacity-40 pointer-events-none" : ""}`}
+                    >
                       {/* Gambar */}
                       <td className="px-4 py-3">
                         <ImageThumb path={item.image_path} />
@@ -334,6 +421,20 @@ const DataSampah = () => {
                         {item.created_at
                           ? dayjs(item.created_at).format("DD-MM-YYYY HH:mm:ss")
                           : "-"}
+                      </td>
+
+                      {/* Aksi */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setConfirmId(item.id)}
+                          disabled={isDeleting}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                            text-red-600 hover:bg-red-50 border border-red-200 transition
+                            disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {isDeleting ? "Menghapus..." : "Hapus"}
+                        </button>
                       </td>
                     </tr>
                   );
