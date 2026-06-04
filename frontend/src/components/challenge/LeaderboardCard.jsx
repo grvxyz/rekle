@@ -11,7 +11,7 @@ function getAccessToken() {
 
 async function fetchLeaderboard(limit = 10) {
   const res = await fetch(
-    `${BASE_URL}/api/v1/users/leaderboard?limit=${limit}`,
+    `${BASE_URL}/users/leaderboard?limit=${limit}`,
     {
       headers: {
         "Content-Type": "application/json",
