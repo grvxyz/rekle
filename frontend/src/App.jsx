@@ -10,6 +10,9 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+import { useState } from "react";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 import { useAuth } from "./context/AuthContext.jsx";
 
@@ -92,11 +95,28 @@ function RedirectIfLoggedIn({ children }) {
 
 // ─── Layouts ───────────────────────────────────────────────────
 
-function AdminLayout({ children }) {
+function AdminLayout({
+  children,
+  sidebarOpen,
+  setSidebarOpen,
+}) {
+
   return (
     <div>
-      <AdminSidebar />
-      <div className="ml-64">{children}</div>
+      <AdminSidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+      />
+
+      <div className="ml-0 md:ml-64 pt-16">
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/40 z-40 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+        {children}
+      </div>
     </div>
   );
 }
@@ -105,7 +125,7 @@ function MitraLayout({ children }) {
   return (
     <div>
       <MitraSidebar />
-      <div className="ml-64">{children}</div>
+      <div className="ml-0 md:ml-64">{children}</div>
     </div>
   );
 }
@@ -170,6 +190,7 @@ function Footer() {
 
 function Layout() {
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isMitraAuth =
     location.pathname === "/mitra/login" ||
@@ -190,7 +211,9 @@ function Layout() {
 
       {/* NAVBAR */}
       {!hideLayout && !isMitraPage && (
-        isAdminPage ? <AdminNavbar /> : <Navbar />
+        isAdminPage
+          ? <AdminNavbar setSidebarOpen={setSidebarOpen} />
+          : <Navbar />
       )}
 
       {/* CONTENT */}
@@ -228,15 +251,15 @@ function Layout() {
           <Route path="/action/khusus"      element={<ProtectedRoute><KhususPage /></ProtectedRoute>} />
 
           {/* ── ADMIN (protected) ───────────────────── */}
-          <Route path="/admin/dashboard"        element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/konfirmasi"        element={<AdminRoute><AdminLayout><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/verifikasi-mitra"  element={<AdminRoute><AdminLayout><VerifikasiMitra /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/user"              element={<AdminRoute><AdminLayout><UserManagement /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/partners"          element={<AdminRoute><AdminLayout><DataMitra /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/waste-data"        element={<AdminRoute><AdminLayout><DataSampah /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/ai-monitoring"     element={<AdminRoute><AdminLayout><AIMonitoring /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/action-tracking"   element={<AdminRoute><AdminLayout><ActionTracking /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/content"           element={<AdminRoute><AdminLayout><ContentManagement /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/dashboard"         element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><AdminDashboard /></AdminLayout></AdminRoute>}/>
+          <Route path="/admin/konfirmasi"        element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><KonfirmasiAksi /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/verifikasi-mitra"  element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><VerifikasiMitra /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/user"              element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><UserManagement /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/partners"          element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><DataMitra /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/waste-data"        element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><DataSampah /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/ai-monitoring"     element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><AIMonitoring /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/action-tracking"   element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><ActionTracking /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/content"           element={<AdminRoute><AdminLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}><ContentManagement /></AdminLayout></AdminRoute>} />
 
           {/* ── MITRA ───────────────────────────────── */}
           <Route path="/mitra/login"      element={<MitraLogin />} />

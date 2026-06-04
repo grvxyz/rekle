@@ -15,7 +15,10 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../../lib/axios.js";
 import { useAuth } from "@/context/AuthContext.jsx";
 
-function AdminSidebar() {
+function AdminSidebar({
+  sidebarOpen,
+  setSidebarOpen,
+}) {
   const [pendingActionCount, setPendingActionCount] = useState(0);
   const [pendingMitraCount,  setPendingMitraCount]  = useState(0);
   const navigate = useNavigate();
@@ -63,7 +66,18 @@ function AdminSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-20 w-64 h-[calc(100vh-80px)] bg-white border-r flex flex-col">
+    <aside
+      className={`
+        fixed left-0
+        top-[72px]
+        h-[calc(100vh-72px)]
+        w-64
+        bg-white border-r flex flex-col z-50
+        transition-transform duration-300
+        md:translate-x-0
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      `}
+    >
       <nav className="space-y-2 p-4 flex-1 overflow-y-auto">
         {menu.map((item) => {
           const Icon = item.icon;
