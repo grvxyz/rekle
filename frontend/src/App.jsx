@@ -194,7 +194,7 @@ function Layout() {
       )}
 
       {/* CONTENT */}
-      <main className={`flex-1 ${!isMitraPage && !hideLayout ? "pt-20" : ""}`}>
+      <main className={`flex-1 ${!isMitraPage && !hideLayout ? : ""}`}>
         <Routes>
 
           {/* ── PUBLIC ──────────────────────────────── */}

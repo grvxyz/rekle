@@ -104,7 +104,7 @@ const FeaturesSection = () => {
     <section
       ref={sectionRef}
       id="features"
-      className="pt-20 sm:pt-28 pb-8 sm:pb-10 px-5 sm:px-6"
+      className="sm:pt-28 pb-8 sm:pb-10 px-5 sm:px-6"
       style={{ background: "#f9fafb" }}
     >
       <div className="max-w-6xl mx-auto">
