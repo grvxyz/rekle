@@ -5,7 +5,7 @@ from app.db.base import Base
 
 
 class PointSetting(Base):
-    # __tablename__ otomatis jadi "point_settings" dari Base
+    __tablename__ = "point_settings"
 
     # key unik per jenis aksi: "scan", "kompos", "daur_ulang",
     # "eco_brick", "reuse", "bank_sampah", "khusus"
@@ -18,8 +18,7 @@ class PointSetting(Base):
 
     # Saldo rupiah — hanya relevan untuk aksi mitra (bank_sampah, dll)
     balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-    # id, created_at, updated_at sudah dari Base — tidak perlu didefinisikan ulang
-
+    
+    # id, created_at, updated_at sudah dari Base
     def __repr__(self):
         return f"<PointSetting key={self.key!r} points={self.points} balance={self.balance}>"
