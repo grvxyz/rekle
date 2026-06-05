@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import Dict, List, Optional
 from datetime import date, datetime, timedelta, timezone
 from pydantic import BaseModel
@@ -100,14 +100,39 @@ def admin_dashboard(
 # USER MANAGEMENT
 # =========================================================
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users")
 def list_all_users(
     skip: int = 0,
     limit: int = 50,
+    search: Optional[str] = None,  # ← TAMBAHAN: parameter search
     db: Session = Depends(get_db),
     _: User = Depends(get_current_superuser),
 ):
-    return db.query(User).offset(skip).limit(limit).all()
+    query = db.query(User)
+
+    # ← TAMBAHAN: filter by nama atau email jika search diisi
+    if search:
+        keyword = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.full_name.ilike(keyword),
+                User.email.ilike(keyword),
+            )
+        )
+
+    # ← TAMBAHAN: hitung total SEBELUM pagination (untuk frontend pagination)
+    total = query.count()
+
+    users = (
+        query
+        .order_by(User.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    # ← TAMBAHAN: kembalikan dict dengan total agar frontend bisa hitung totalPages
+    return {"users": users, "total": total}
 
 
 @router.patch("/users/{user_id}/toggle-active", response_model=UserResponse)
@@ -177,7 +202,6 @@ def list_all_scans(
     return ScanHistoryList(total=total, items=items)
 
 
-# ── TAMBAHAN BARU ──────────────────────────────────────────
 @router.delete("/scans/{prediction_id}", status_code=204)
 def admin_delete_scan(
     prediction_id: int,
@@ -189,16 +213,14 @@ def admin_delete_scan(
     if not prediction:
         raise HTTPException(status_code=404, detail="Scan tidak ditemukan")
 
-    # Hapus file gambar dari disk jika ada
     if prediction.image_path and os.path.exists(prediction.image_path):
         try:
             os.remove(prediction.image_path)
         except OSError:
-            pass  # Lanjut meski file gagal dihapus
+            pass
 
     db.delete(prediction)
     db.commit()
-# ──────────────────────────────────────────────────────────
 
 
 # =========================================================
