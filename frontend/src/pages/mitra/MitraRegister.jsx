@@ -416,11 +416,13 @@ const MitraRegister = () => {
         password: form.password,
       });
 
-      localStorage.setItem("access_token", loginData.access_token);
+      sessionStorage.setItem("access_token", loginData.access_token);
+
       if (loginData.refresh_token) {
-        localStorage.setItem("refresh_token", loginData.refresh_token);
+        sessionStorage.setItem("refresh_token", loginData.refresh_token);
       }
-      localStorage.setItem("is_superuser", "false");
+
+      sessionStorage.setItem("is_superuser", "false");
 
       // 3. Buat entitas Mitra ke /api/v1/mitra/mine
       await api.post("/mitra/mine", {
@@ -459,8 +461,8 @@ const MitraRegister = () => {
     );
   }
 
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("refresh_token");
 } finally {
   setLoading(false);
 } };

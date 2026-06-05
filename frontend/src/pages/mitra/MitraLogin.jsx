@@ -53,8 +53,13 @@ const MitraLogin = () => {
       let hasMitra = false;
       try {
         const { data: mitraList } = await api.get("/mitra/mine");
+
+        console.log("MITRA DATA:", mitraList);
+
         hasMitra = Array.isArray(mitraList) && mitraList.length > 0;
-      } catch {
+
+      } catch (err) {
+        console.error("MITRA ERROR:", err);
         hasMitra = false;
       }
 
